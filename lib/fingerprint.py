@@ -2,6 +2,7 @@ from dataclasses import dataclass
 from typing import List
 import math
 
+
 class DatasetUID(bytes):
     def __init__(self, *args, **kwargs):
         super().__init__(*args, **kwargs)
@@ -9,6 +10,7 @@ class DatasetUID(bytes):
             raise ValueError("Dataset UID must be a valid SHA256 hash. Length is invalid.")
         if not all(c in string.hexdigits for c in self):
             raise ValueError("Dataset UID must be a valid SHA256 hash. Found an invalid character.")
+
 
 @dataclass
 class DatasetFingerprint:
@@ -26,5 +28,5 @@ class DatasetFingerprint:
         """Return the accuracy that this fingerprint has when compared to another fingerprint
         to approximate the Jaccard distance between two canonical datasets"""
         if self.signatures:
-            return 1.0-(1.0/math.sqrt(len(self.signatures)))
+            return 1.0 - (1.0 / math.sqrt(len(self.signatures)))
         return 0.0

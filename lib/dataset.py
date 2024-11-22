@@ -7,21 +7,26 @@ from .config import ConfigV0
 import torch
 import PIL
 
+
 class DatasetType(Enum):
     SIMPLE_FILE_TREE = "File based"
     TABULAR = "Tabular data"
     TORCH = "Torch dataset format"
 
+
 class Dataset:
     """An abstract class that represents a dataset to be fingerprinted"""
+
     def __init__(self, t: DatasetType):
         self.type = t
+
 
 # TODO(boyan): this should be versioned depending on the torchvision version as they might change their
 # underlying format
 # TODO(boyan): see whether we can use this class for torch datasets in general, or just torchvision.
 class TorchVisionDataset(Dataset):
     """Dataset loaded using the torch python API"""
+
     def __init__(self, dataset: torch.utils.data.TensorDataset):
         super().__init__(DatasetType.TORCH)
         self.dataset = dataset
@@ -29,7 +34,7 @@ class TorchVisionDataset(Dataset):
     @property
     def data_points(self) -> Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
-        for x,_ in self.dataset:
+        for x, _ in self.dataset:
             yield self.data_point_to_bytes(x)
 
     def data_point_to_bytes(self, data: Any) -> bytes:
@@ -41,11 +46,12 @@ class TorchVisionDataset(Dataset):
 
     def _PIL_image_to_bytes_v0(self, data: PIL.Image) -> bytes:
         # Return raw image data
-        return data.tobytes(encoder_name='raw')
+        return data.tobytes(encoder_name="raw")
 
 
 class CanonicalDataset:
     """A format agnostic canonical dataset representation to compute fingerprints"""
+
     def __init__(self, dataset: Dataset, config=ConfigV0):
         self.data_point_hashes: List[bytes] = []
         self._uid: Optional[DatasetUID] = None
@@ -78,7 +84,7 @@ class CanonicalDataset:
     def uid(self) -> DatasetUID:
         """Generate dataset unique identifier"""
         self._check_preprocess()
-        if self._uid is None: 
+        if self._uid is None:
             # Hash the concatenation of the data points
             hash_function = hashlib.sha256()
             for h in self.data_point_hashes:
@@ -91,7 +97,7 @@ class CanonicalDataset:
         """Generate dataset fingerprint"""
         self._check_preprocess()
         if self._fingerprint is None:
-            res = [None]*400
+            res = [None] * 400
             for i in range(self.config.nb_signatures):
                 for h in self.data_point_hashes:
                     h2 = hashlib.sha256(h + self.config.lsh_magic_numbers[i]).digest()
