@@ -13,5 +13,3 @@ jobs:
     steps:
       - uses: actions/checkout@v4
       - uses: psf/black@stable
-        with:
-          use_pyproject: true
