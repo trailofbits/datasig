@@ -33,4 +33,4 @@ py-modules = ['datasig']
 
 [tool.black]
 line-length = 100
-extend-exclude = '''^/lib/test'''
+extend-exclude = '''^/.*/test'''
