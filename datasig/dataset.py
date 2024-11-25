@@ -1,17 +1,20 @@
 from enum import Enum
 from dataclasses import dataclass
-from typing import Any, List, Generator
+from typing import Any, List, Generator, Union, Iterable
 import hashlib
 from .fingerprint import DatasetUID, DatasetFingerprint
 from .config import ConfigV0
 import torch
 import PIL
+from pathlib import Path
+import io
+import csv
 
 
 class DatasetType(Enum):
     SIMPLE_FILE_TREE = "File based"
-    TABULAR = "Tabular data"
     TORCH = "Torch dataset format"
+    CSV = "CSV file"
 
 
 class Dataset:
@@ -47,6 +50,49 @@ class TorchVisionDataset(Dataset):
     def _PIL_image_to_bytes_v0(self, data: PIL.Image) -> bytes:
         # Return raw image data
         return data.tobytes(encoder_name="raw")
+
+
+class CSVDataset(Dataset):
+    """Dataset contained in a CSV file"""
+
+    def __init__(
+        self, csv_data: Union[Iterable[str], List[str], Path, str], dialect="excel", **fmtparams
+    ):
+        super().__init__(DatasetType.CSV)
+        if isinstance(
+            csv_data,
+            (
+                Path,
+                str,
+            ),
+        ):
+            # Read from static file
+            self.csv_data = open(csv_data, "r", newline="\n")
+        else:
+            # Already a list or iterable of rows
+            self.csv_data = csv_data
+        self.csv_reader = csv.reader(self.csv_data, dialect=dialect, **fmtparams)
+
+    def __del__(self):
+        if isinstance(self.csv_data, io.IOBase):
+            # If data came from a file we opened, close the file
+            self.csv_data.close()
+
+    @property
+    def data_points(self) -> Generator[bytes, None, None]:
+        """Iterate through all data points (transformed as bytes)"""
+        # FIXME(boyan): we must ignore the row that contains
+        # the labels. The easiest way is to ignore the first row, but we
+        # must be sure it's the one containing labels, if there are labels...
+        for row in self.csv_reader:
+            yield self._row_to_bytes_v0(row)
+
+    def _row_to_bytes_v0(self, row: List[str]) -> bytes:
+        """Tranform a data point to its `bytes` representation"""
+        res = io.StringIO()
+        writer = csv.writer(res, dialect=self.csv_reader.dialect)
+        writer.writerow(row)
+        return bytes(res.getvalue(), "utf-8")
 
 
 class CanonicalDataset:
