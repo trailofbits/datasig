@@ -11,4 +11,3 @@ sympy==1.13.1
 torch==2..1
 torchvision==0.20.1
 typing_extensions==4.12.2
-
