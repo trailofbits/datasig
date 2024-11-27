@@ -22,3 +22,27 @@ canonical = CanonicalDataset(dataset)
 print("Dataset UID: ", canonical.uid)
 print("Dataset fingerprint: ", canonical.fingerprint)
 ```
+
+## Development
+### Profiling
+The profiling script generates a profile for dataset processing and fingerprint generation using cProfile. To profile the MNIST dataset from the torch framework,
+you can run:
+
+```bash
+python3 profiling.py torch_mnist --full
+```
+
+The `--full` argument tells the script to include dataset canonization, UID generation, and fingerprint generation in the profile. If you want to profile only some of these steps you can cherry pick by using or omitting the following arguments instead:
+
+```bash
+python3 profiling.py torch_mnist --canonical --uid --fingerprint
+```
+
+You can optionally specify the datasig config version to use (at the time of writing we have only v0) with:  
+
+```bash
+python3 profiling.py torch_mnist -v 0 --all
+```
+
+Currently we support only one target dataset: `torch_mnist`. To add another dataset, add a class in `profiling.py` similar to `TorchMNISTV0`, that implements the `_setup()` method which is responsible for loading the dataset.
+
