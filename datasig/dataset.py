@@ -47,7 +47,7 @@ class TorchVisionDataset(Dataset):
         else:
             raise Exception(f"Unsupported data point type: {type(data)}")
 
-    def _PIL_image_to_bytes_v0(self, data: PIL.Image) -> bytes:
+    def _PIL_image_to_bytes_v0(self, data: PIL.Image.Image) -> bytes:
         # Return raw image data
         return data.tobytes(encoder_name="raw")
 
