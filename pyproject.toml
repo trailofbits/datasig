@@ -12,6 +12,7 @@ dependencies = [
     "numpy==1.26.4",
     "pillow==11.0.0",
     "pytest==8.3.3",
+    "requests==2.32.3",
     "sympy==1.13.1",
     "torch==2.2.2",
     "torchvision==0.17.2",
