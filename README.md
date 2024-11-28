@@ -24,6 +24,15 @@ print("Dataset fingerprint: ", canonical.fingerprint)
 ```
 
 ## Development
+### Unit tests
+Tests are in the `datasig/test` directory. You can run the tests with:
+
+```bash
+python3 -m pytest # Run all tests
+python3 -m pytest -s datasig/test/test_csv.py # Run only one test file
+python3 -m pytest -s datasig/test/test_csv.py -k test_similarity # Run only one specific test function
+```
+
 ### Profiling
 The profiling script generates a profile for dataset processing and fingerprint generation using cProfile. To profile the MNIST dataset from the torch framework,
 you can run:
