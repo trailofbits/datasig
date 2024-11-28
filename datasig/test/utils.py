@@ -1,6 +1,7 @@
 from ..dataset import CanonicalDataset
 import requests
 import shutil
+import arff
 
 def download_file(url, outfile=None) -> str:
     if not outfile:
@@ -32,4 +33,14 @@ def extract_csv_range(csv_file: "str", start: int, end: int, outfile: str) -> st
             outf.write(lines[0])
             for l in lines[start+1:end+1]: # +1 to ignore first row
                 outf.write(l)
+    return outfile
+
+
+def extract_arff_range(arff_file: "str", start: int, end: int, outfile: str) -> str:
+    """Extracts a range of data points from an ARFF file into another ARFF file"""
+    with open(arff_file, "r") as f:
+        with open(outfile, "w") as outf:
+            data = arff.load(f)
+            data['data'] = data['data'][start:end]
+            outf.write(arff.dumps(data))
     return outfile

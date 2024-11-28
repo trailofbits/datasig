@@ -15,6 +15,7 @@ class DatasetType(Enum):
     SIMPLE_FILE_TREE = "File based"
     TORCH = "Torch dataset format"
     CSV = "CSV file"
+    ARFF = "ARFF file"
 
 
 class Dataset:
@@ -50,6 +51,24 @@ class TorchVisionDataset(Dataset):
     def _PIL_image_to_bytes_v0(self, data: PIL.Image.Image) -> bytes:
         # Return raw image data
         return data.tobytes(encoder_name="raw")
+
+
+class ARFFDataset(Dataset):
+    """Dataset contained in an ARFF file"""
+    def __init__(self, arff_file: Union[Path, str]):
+        super().__init__(DatasetType.ARFF)
+        self.arff_file = arff_file
+
+    @property
+    def data_points(self) -> Generator[bytes, None, None]:
+        """Iterate through all data points (transformed as bytes)"""
+        # The parsing is based on https://waikato.github.io/weka-wiki/formats_and_processing/arff_stable/
+        with open(self.arff_file, "rb") as f:
+            reached_data = False
+            for line in f:
+                if reached_data:
+                    yield line
+                reached_data |= line.startswith((b'@data', b'@DATA'))
 
 
 class CSVDataset(Dataset):
