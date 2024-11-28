@@ -55,6 +55,7 @@ class TorchVisionDataset(Dataset):
 
 class ARFFDataset(Dataset):
     """Dataset contained in an ARFF file"""
+
     def __init__(self, arff_file: Union[Path, str]):
         super().__init__(DatasetType.ARFF)
         self.arff_file = arff_file
@@ -68,7 +69,7 @@ class ARFFDataset(Dataset):
             for line in f:
                 if reached_data:
                     yield line
-                reached_data |= line.startswith((b'@data', b'@DATA'))
+                reached_data |= line.startswith((b"@data", b"@DATA"))
 
 
 class CSVDataset(Dataset):
