@@ -25,6 +25,10 @@ authors = [
     {name = "Lucas Bourtoule", email = "lucas.bourtoule@trailofbits.com"},
     {name = "Boyan Milanov", email = "boyan.milanov@trailofbits.com"},
 ]
+license = "AGPLv3"
+license-files = [
+    "LICENSE*",
+]
 
 [build-system]
 requires = ["setuptools >= 61.0"]
