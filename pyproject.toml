@@ -1,42 +1,13 @@
 [project]
 name = "datasig"
-version = "0.0.1"
-dependencies = [
-    "filelock==3.16.1",
-    "fsspec==2024.10.0",
-    "Jinja2==3.1.6",
-    "liac-arff==2.5.0",
-    "MarkupSafe==3.0.2",
-    "mpmath==1.3.0",
-    "networkx==3.4.2",
-    "numpy==1.26.4",
-    "pillow==11.0.0",
-    "pytest==8.3.3",
-    "requests==2.32.3",
-    "sympy==1.13.1",
-    "torch==2.2.2",
-    "torchvision==0.17.2",
-    "typing_extensions==4.12.2"
-]
-requires-python = ">= 3.8"
+version = "0.1.0"
+description = "Add your description here"
 readme = "README.md"
-description = "Dataset fingerprinting library"
-authors = [
-    {name = "Lucas Bourtoule", email = "lucas.bourtoule@trailofbits.com"},
-    {name = "Boyan Milanov", email = "boyan.milanov@trailofbits.com"},
+requires-python = ">=3.12"
+dependencies = [
+    "datasketch>=1.6.5",
+    "pillow>=11.1.0",
+    "torch>=2.6.0",
+    "torchvision>=0.21.0",
+    "tqdm>=4.67.1",
 ]
-license = "AGPL-3.0-only"
-license-files = [
-    "LICENSE*",
-]
-
-[build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
-
-[tool.setuptools]
-py-modules = ['datasig']
-
-[tool.black]
-line-length = 100
-extend-exclude = '''^/.*/test'''

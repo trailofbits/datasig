@@ -1,10 +1,10 @@
 from torchvision.datasets import MNIST
 from datasig.config import ConfigV0
-from datasig.dataset import CanonicalDataset, Dataset, TorchVisionDataset
+from datasig.dataset import CanonicalDataset, Dataset, TorchVisionDataset, DatasetFingerprint
 import cProfile
-import sys
 import argparse
 import pstats
+import typing as t
 
 
 class FingerprintProfile:
@@ -45,11 +45,21 @@ class FingerprintProfile:
         self._run_profile(uid=profile_uid, fingerprint=profile_fingerprint)
         return self.profile
 
+def torch_mnist_v0(prop: t.Callable[[CanonicalDataset], DatasetFingerprint]) -> t.Callable:
+    class TorchMNISTV0(FingerprintProfile):
+        def _setup(self):
+            train_data = MNIST(root="/tmp/mnist_data", train=True, download=True)
+            self.dataset = TorchVisionDataset(train_data)
 
-class TorchMNISTV0(FingerprintProfile):
-    def _setup(self):
-        train_data = MNIST(root="/tmp/mnist_data", train=True, download=True)
-        self.dataset = TorchVisionDataset(train_data)
+        def _run_profile(self, uid=True, fingerprint=True):
+            self.profile.enable()
+            if uid:
+                _ = self.canonical.uid
+            if fingerprint:
+                _ = prop(self.canonical)
+            self.profile.disable()
+    
+    return TorchMNISTV0
 
 
 def print_profile(profile: cProfile.Profile):
@@ -61,7 +71,10 @@ def print_profile(profile: cProfile.Profile):
 def main(args):
     # Keys are (Target, datasig config version)
     target_map = {
-        ("torch_mnist", "0"): TorchMNISTV0,
+        ("torch_mnist_keyed_sha", "0"): torch_mnist_v0(lambda x: x.fingerprint),
+        ("torch_mnist_xor", "0"): torch_mnist_v0(lambda x: x.xor_fingerprint),
+        ("torch_mnist_single_sha", "0"): torch_mnist_v0(lambda x: x.single_fingerprint),
+        ("torch_mnist_datasketch", "0"): torch_mnist_v0(lambda x: x.datasketch_fingerprint),
     }
 
     for target in args.targets:

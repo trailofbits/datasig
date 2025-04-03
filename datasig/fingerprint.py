@@ -1,6 +1,8 @@
 from dataclasses import dataclass
 from typing import List
 import math
+import string
+from datasketch import MinHash
 
 
 class DatasetUID(bytes):
@@ -14,15 +16,30 @@ class DatasetUID(bytes):
 
 @dataclass
 class DatasetFingerprint:
-    signatures: List[bytes]
+    signatures: List[bytes] | MinHash
+    jacard: bool = False
 
     def __len__(self):
         return len(self.signatures)
 
     def similarity(self, other: "DatasetFingerprint"):
-        assert len(self) == len(other)
-        # Count how many signature pairs are made of identical signatures
-        return sum(map(lambda x: x[0] == x[1], zip(self.signatures, other.signatures))) / len(self)
+        if isinstance(self.signatures, MinHash):
+            return self.signatures.jaccard(other.signatures)
+        elif self.jacard:
+            ha = set(self.signatures)
+            hb = set(other.signatures)
+
+            u = list(ha.union(hb))
+            list.sort(u)
+            x = set(u[:400])
+
+            y = x.intersection(ha, hb)
+
+            return len(y)/400
+        else:
+            assert len(self) == len(other)
+            # Count how many signature pairs are made of identical signatures
+            return sum(map(lambda x: x[0] == x[1], zip(self.signatures, other.signatures))) / len(self)
 
     def comparison_accuracy(self) -> float:
         """Return the accuracy that this fingerprint has when compared to another fingerprint

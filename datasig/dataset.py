@@ -1,6 +1,5 @@
 from enum import Enum
-from dataclasses import dataclass
-from typing import Any, List, Generator, Union, Iterable
+import typing as t
 import hashlib
 from .fingerprint import DatasetUID, DatasetFingerprint
 from .config import ConfigV0
@@ -9,6 +8,7 @@ import PIL
 from pathlib import Path
 import io
 import csv
+from datasketch import MinHash
 
 
 class DatasetType(Enum):
@@ -36,12 +36,12 @@ class TorchVisionDataset(Dataset):
         self.dataset = dataset
 
     @property
-    def data_points(self) -> Generator[bytes, None, None]:
+    def data_points(self) -> t.Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         for x, _ in self.dataset:
             yield self.data_point_to_bytes(x)
 
-    def data_point_to_bytes(self, data: Any) -> bytes:
+    def data_point_to_bytes(self, data: t.Any) -> bytes:
         """Tranform a data point to its `bytes` representation"""
         if isinstance(data, PIL.Image.Image):
             return self._PIL_image_to_bytes_v0(data)
@@ -56,12 +56,12 @@ class TorchVisionDataset(Dataset):
 class ARFFDataset(Dataset):
     """Dataset contained in an ARFF file"""
 
-    def __init__(self, arff_file: Union[Path, str]):
+    def __init__(self, arff_file: t.Union[Path, str]):
         super().__init__(DatasetType.ARFF)
         self.arff_file = arff_file
 
     @property
-    def data_points(self) -> Generator[bytes, None, None]:
+    def data_points(self) -> t.Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         # The parsing is based on https://waikato.github.io/weka-wiki/formats_and_processing/arff_stable/
         with open(self.arff_file, "rb") as f:
@@ -76,7 +76,7 @@ class CSVDataset(Dataset):
     """Dataset contained in a CSV file"""
 
     def __init__(
-        self, csv_data: Union[Iterable[str], List[str], Path, str], dialect="excel", **fmtparams
+        self, csv_data: t.Union[t.Iterable[str], t.List[str], Path, str], dialect="excel", **fmtparams
     ):
         super().__init__(DatasetType.CSV)
         if isinstance(
@@ -99,7 +99,7 @@ class CSVDataset(Dataset):
             self.csv_data.close()
 
     @property
-    def data_points(self) -> Generator[bytes, None, None]:
+    def data_points(self) -> t.Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         # FIXME(boyan): we must ignore the row that contains
         # the labels. The easiest way is to ignore the first row, but we
@@ -107,7 +107,7 @@ class CSVDataset(Dataset):
         for row in self.csv_reader:
             yield self._row_to_bytes_v0(row)
 
-    def _row_to_bytes_v0(self, row: List[str]) -> bytes:
+    def _row_to_bytes_v0(self, row: t.List[str]) -> bytes:
         """Tranform a data point to its `bytes` representation"""
         res = io.StringIO()
         writer = csv.writer(res, dialect=self.csv_reader.dialect)
@@ -119,11 +119,15 @@ class CanonicalDataset:
     """A format agnostic canonical dataset representation to compute fingerprints"""
 
     def __init__(self, dataset: Dataset, config=ConfigV0):
-        self.data_point_hashes: List[bytes] = []
-        self._uid: Optional[DatasetUID] = None
-        self._fingerprint: Optional[DatasetFingerprint] = None
-        self.preprocessed: bool = False
+        self.dataset = dataset
         self.config = config
+        
+        self.data_point_hashes: t.List[bytes] = []
+        self._uid: t.Optional[DatasetUID] = None
+        self._fingerprint: t.Optional[DatasetFingerprint] = None
+        self._datasketch_fingerprint: MinHash | None = None
+        self._xor_fingerprint: t.Optional[DatasetFingerprint] = None
+        self.preprocessed: bool = False
 
         for d in dataset.data_points:
             self.add_data_point(d)
@@ -163,7 +167,7 @@ class CanonicalDataset:
         """Generate dataset fingerprint"""
         self._check_preprocess()
         if self._fingerprint is None:
-            res = [None] * 400
+            res = [None] * self.config.nb_signatures
             for i in range(self.config.nb_signatures):
                 for h in self.data_point_hashes:
                     h2 = hashlib.sha256(h + self.config.lsh_magic_numbers[i]).digest()
@@ -171,3 +175,34 @@ class CanonicalDataset:
                         res[i] = h2
             self._fingerprint = DatasetFingerprint(res)
         return self._fingerprint
+    
+    @property
+    def xor_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint"""
+        self._check_preprocess()
+        if self._xor_fingerprint is None:
+            res = [None] * self.config.nb_signatures
+            for i in range(self.config.nb_signatures):
+                for h in self.data_point_hashes:
+                    h2 = [a ^ b for a, b in zip(h, self.config.xor_numbers[i])]
+                    if res[i] is None or res[i] > h2:
+                        res[i] = h2
+            self._xor_fingerprint = DatasetFingerprint(res)
+        return self._xor_fingerprint
+    
+    @property
+    def single_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint"""
+        self._check_preprocess()
+        return DatasetFingerprint(self.data_point_hashes[:400], jacard=True)
+    
+    @property
+    def datasketch_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint"""
+        
+        if self._datasketch_fingerprint is None:
+            self._datasketch_fingerprint = MinHash()
+            for d in self.dataset.data_points:
+                self._datasketch_fingerprint.update(d)
+
+        return DatasetFingerprint(self._datasketch_fingerprint)
