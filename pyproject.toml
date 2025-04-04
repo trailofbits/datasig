@@ -11,3 +11,8 @@ dependencies = [
     "torchvision>=0.21.0",
     "tqdm>=4.67.1",
 ]
+
+[dependency-groups]
+dev = [
+    "black>=25.1.0",
+]
