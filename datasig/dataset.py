@@ -1,14 +1,14 @@
 from enum import Enum
-from dataclasses import dataclass
-from typing import Any, List, Generator, Union, Iterable
+import typing as t
 import hashlib
-from .fingerprint import DatasetUID, DatasetFingerprint
-from .config import ConfigV0
+from .fingerprint import DatasetUID, DatasetFingerprint, MinHashType
+from .config import *
 import torch
 import PIL
 from pathlib import Path
 import io
 import csv
+from datasketch import MinHash
 
 
 class DatasetType(Enum):
@@ -36,12 +36,12 @@ class TorchVisionDataset(Dataset):
         self.dataset = dataset
 
     @property
-    def data_points(self) -> Generator[bytes, None, None]:
+    def data_points(self) -> t.Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         for x, _ in self.dataset:
             yield self.data_point_to_bytes(x)
 
-    def data_point_to_bytes(self, data: Any) -> bytes:
+    def data_point_to_bytes(self, data: t.Any) -> bytes:
         """Tranform a data point to its `bytes` representation"""
         if isinstance(data, PIL.Image.Image):
             return self._PIL_image_to_bytes_v0(data)
@@ -56,12 +56,12 @@ class TorchVisionDataset(Dataset):
 class ARFFDataset(Dataset):
     """Dataset contained in an ARFF file"""
 
-    def __init__(self, arff_file: Union[Path, str]):
+    def __init__(self, arff_file: t.Union[Path, str]):
         super().__init__(DatasetType.ARFF)
         self.arff_file = arff_file
 
     @property
-    def data_points(self) -> Generator[bytes, None, None]:
+    def data_points(self) -> t.Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         # The parsing is based on https://waikato.github.io/weka-wiki/formats_and_processing/arff_stable/
         with open(self.arff_file, "rb") as f:
@@ -76,7 +76,10 @@ class CSVDataset(Dataset):
     """Dataset contained in a CSV file"""
 
     def __init__(
-        self, csv_data: Union[Iterable[str], List[str], Path, str], dialect="excel", **fmtparams
+        self,
+        csv_data: t.Union[t.Iterable[str], t.List[str], Path, str],
+        dialect="excel",
+        **fmtparams,
     ):
         super().__init__(DatasetType.CSV)
         if isinstance(
@@ -99,7 +102,7 @@ class CSVDataset(Dataset):
             self.csv_data.close()
 
     @property
-    def data_points(self) -> Generator[bytes, None, None]:
+    def data_points(self) -> t.Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         # FIXME(boyan): we must ignore the row that contains
         # the labels. The easiest way is to ignore the first row, but we
@@ -107,7 +110,7 @@ class CSVDataset(Dataset):
         for row in self.csv_reader:
             yield self._row_to_bytes_v0(row)
 
-    def _row_to_bytes_v0(self, row: List[str]) -> bytes:
+    def _row_to_bytes_v0(self, row: t.List[str]) -> bytes:
         """Tranform a data point to its `bytes` representation"""
         res = io.StringIO()
         writer = csv.writer(res, dialect=self.csv_reader.dialect)
@@ -118,12 +121,18 @@ class CSVDataset(Dataset):
 class CanonicalDataset:
     """A format agnostic canonical dataset representation to compute fingerprints"""
 
-    def __init__(self, dataset: Dataset, config=ConfigV0):
-        self.data_point_hashes: List[bytes] = []
-        self._uid: Optional[DatasetUID] = None
-        self._fingerprint: Optional[DatasetFingerprint] = None
+    def __init__(self, dataset: Dataset):
+        self.dataset = dataset
+
+        self.data_point_hashes: t.List[bytes] = []
+        self._uid: DatasetUID | None = None
+        self._fingerprint: dict[type, DatasetFingerprint | None] = {
+            KeyedSha: None,
+            Xor: None,
+            SingleSha: None,
+            Datasketch: None,
+        }
         self.preprocessed: bool = False
-        self.config = config
 
         for d in dataset.data_points:
             self.add_data_point(d)
@@ -158,16 +167,79 @@ class CanonicalDataset:
             self._uid = hash_function.digest()
         return self._uid
 
+    def gen_fingerprint(self, algo: AlgoV0 = KeyedSha()) -> DatasetFingerprint:
+        """Generate dataset fingerprint using given algorithm"""
+        if self._fingerprint[type(algo)] is None:
+            match algo:
+                case KeyedSha(nb_signatures, magic_numbers) | Xor(
+                    nb_signatures, magic_numbers
+                ):
+                    self._check_preprocess()
+                    res = [None] * nb_signatures
+                    for i in range(nb_signatures):
+                        for h in self.data_point_hashes:
+                            match algo:
+                                case KeyedSha(_):
+                                    h2 = hashlib.sha256(h + magic_numbers[i]).digest()
+                                case Xor(_):
+                                    h2 = [a ^ b for a, b in zip(h, magic_numbers[i])]
+                            if res[i] is None or res[i] > h2:
+                                res[i] = h2
+                    self._fingerprint[type(algo)] = DatasetFingerprint(
+                        res, MinHashType.MULTI
+                    )
+                case SingleSha(nb_signatures):
+                    self._check_preprocess()
+                    self._fingerprint[SingleSha] = DatasetFingerprint(
+                        self.data_point_hashes[:nb_signatures], MinHashType.SINGLE
+                    )
+                case Datasketch():
+                    res = MinHash()
+                    for d in self.dataset.data_points:
+                        res.update(d)
+                    self._fingerprint[Datasketch] = DatasetFingerprint(
+                        res, MinHashType.DATASKETCH
+                    )
+        return self._fingerprint[type(algo)]
+
     @property
-    def fingerprint(self) -> DatasetFingerprint:
-        """Generate dataset fingerprint"""
-        self._check_preprocess()
-        if self._fingerprint is None:
-            res = [None] * 400
-            for i in range(self.config.nb_signatures):
-                for h in self.data_point_hashes:
-                    h2 = hashlib.sha256(h + self.config.lsh_magic_numbers[i]).digest()
-                    if res[i] is None or res[i] > h2:
-                        res[i] = h2
-            self._fingerprint = DatasetFingerprint(res)
-        return self._fingerprint
+    def keyed_sha_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint based on keyed-SHA permutations.
+
+        The figerprint is computed using the MinHash scheme.
+        Random permutations are approximated by keyed SHA256 functions i.e. random bytes are appended to the input of SHA256.
+
+        See https://web.eecs.utk.edu/~jplank/plank/classes/cs494/494/notes/Min-Hash/index.html, Min Hash with k hash functions.
+        """
+        return self.gen_fingerprint(algo=KeyedSha())
+
+    @property
+    def xor_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint based on XOR permutations.
+
+        The figerprint is computed using the MinHash scheme.
+        Random permutations are approximated by the output of SHA256 XORed with random 256 bits values.
+        """
+        return self.gen_fingerprint(algo=Xor())
+
+    @property
+    def single_sha_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint based on a single SHA permutation
+
+        The figerprint is computed using the MinHash scheme with a single permutation approximated by SHA256.
+
+        See https://web.eecs.utk.edu/~jplank/plank/classes/cs494/494/notes/Min-Hash/index.html, Min Hash with one hash functions.
+        And https://en.wikipedia.org/wiki/MinHash#Variant_with_a_single_hash_function.
+        """
+        return self.gen_fingerprint(algo=SingleSha())
+
+    @property
+    def datasketch_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint based on universal hashing permutations
+
+        The figerprint is computed using the MinHash scheme.
+        Random permutations are approximated by universal hashing.
+
+        See https://ekzhu.com/datasketch/minhash.html.
+        """
+        return self.gen_fingerprint(algo=Datasketch())

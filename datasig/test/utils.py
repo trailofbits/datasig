@@ -32,7 +32,8 @@ def assert_fingerprint_similarity(
 
 def extract_csv_range(csv_file: "str", start: int, end: int, outfile: str) -> str:
     """Extracts a range of rows of a CSV file into another CSV file.
-    This assumes that each row is delimited by a newline, and that the first row is labels"""
+    This assumes that each row is delimited by a newline, and that the first row is labels
+    """
     with open(csv_file, "rb") as f:
         with open(outfile, "wb") as outf:
             lines = f.readlines()
