@@ -2,13 +2,14 @@ from enum import Enum
 from dataclasses import dataclass
 from typing import Any, List, Generator, Union, Iterable
 import hashlib
-from .fingerprint import DatasetUID, DatasetFingerprint
+from .fingerprint import DatasetUID, DatasetFingerprint, BasicDatasetFingerprint
 from .config import ConfigV0
 import torch
-import PIL
+from PIL import Image
 from pathlib import Path
 import io
 import csv
+from abc import ABC, abstractmethod
 
 
 class DatasetType(Enum):
@@ -18,11 +19,23 @@ class DatasetType(Enum):
     ARFF = "ARFF file"
 
 
-class Dataset:
+class Dataset(ABC):
     """An abstract class that represents a dataset to be fingerprinted"""
 
     def __init__(self, t: DatasetType):
         self.type = t
+
+    @property
+    @abstractmethod
+    def data_points(self) -> Generator[bytes, None, None]:
+        """Iterate through all data points (transformed as bytes)"""
+        pass
+
+    @property
+    @abstractmethod
+    def name(self) -> str:
+        """Name identifying the dataset"""
+        pass
 
 
 # TODO(boyan): this should be versioned depending on the torchvision version as they might change their
@@ -36,6 +49,12 @@ class TorchVisionDataset(Dataset):
         self.dataset = dataset
 
     @property
+    def name(self) -> str:
+        """Name identifying the dataset"""
+        # In torch the dataset class names are descriptive like `MNIST`
+        return type(self.dataset).__name__
+
+    @property
     def data_points(self) -> Generator[bytes, None, None]:
         """Iterate through all data points (transformed as bytes)"""
         for x, _ in self.dataset:
@@ -43,12 +62,12 @@ class TorchVisionDataset(Dataset):
 
     def data_point_to_bytes(self, data: Any) -> bytes:
         """Tranform a data point to its `bytes` representation"""
-        if isinstance(data, PIL.Image.Image):
+        if isinstance(data, Image.Image):
             return self._PIL_image_to_bytes_v0(data)
         else:
             raise Exception(f"Unsupported data point type: {type(data)}")
 
-    def _PIL_image_to_bytes_v0(self, data: PIL.Image.Image) -> bytes:
+    def _PIL_image_to_bytes_v0(self, data: Image.Image) -> bytes:
         # Return raw image data
         return data.tobytes(encoder_name="raw")
 
@@ -59,6 +78,11 @@ class ARFFDataset(Dataset):
     def __init__(self, arff_file: Union[Path, str]):
         super().__init__(DatasetType.ARFF)
         self.arff_file = arff_file
+
+    @property
+    def name(self) -> str:
+        """Name identifying the dataset"""
+        return str(self.arff_file)
 
     @property
     def data_points(self) -> Generator[bytes, None, None]:
@@ -88,9 +112,12 @@ class CSVDataset(Dataset):
         ):
             # Read from static file
             self.csv_data = open(csv_data, "r", newline="\n")
+            self.name = str(csv_data)
         else:
             # Already a list or iterable of rows
             self.csv_data = csv_data
+            # TODO(boyan): proper naming here needs to come from the user
+            self.name = "Raw CSV data supplied from python"
         self.csv_reader = csv.reader(self.csv_data, dialect=dialect, **fmtparams)
 
     def __del__(self):
@@ -169,5 +196,5 @@ class CanonicalDataset:
                     h2 = hashlib.sha256(h + self.config.lsh_magic_numbers[i]).digest()
                     if res[i] is None or res[i] > h2:
                         res[i] = h2
-            self._fingerprint = DatasetFingerprint(res)
+            self._fingerprint = BasicDatasetFingerprint(res)
         return self._fingerprint
