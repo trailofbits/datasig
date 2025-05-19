@@ -13,7 +13,7 @@ csv_file = download_file(
 
 def test_csv_v0():
     dataset = CSVDataset(csv_file, delimiter=",")
-    canonical = CanonicalDataset(dataset, config=ConfigV0)
+    canonical = CanonicalDataset(dataset, config=ConfigV0())
     # Test UID and fingerprint
     from pprint import pprint
 
@@ -428,7 +428,7 @@ def test_csv_v0():
     ]
 
 
-@pytest.mark.parametrize("config", [ConfigV0])
+@pytest.mark.parametrize("config", [ConfigV0()])
 def test_similarity(config):
     data1 = extract_csv_range(csv_file, 0, 5000, "/tmp/data1.csv")
     data2 = extract_csv_range(csv_file, 5000, 10000, "/tmp/data2.csv")

@@ -12,7 +12,7 @@ test_data = MNIST(root="/tmp/mnist_data", train=False, download=True)
 
 def test_mnist_v0():
     dataset = TorchVisionDataset(test_data)
-    canonical = CanonicalDataset(dataset, config=ConfigV0)
+    canonical = CanonicalDataset(dataset, config=ConfigV0())
     # Test UID and fingerprint
     assert (
         canonical.uid
@@ -423,7 +423,7 @@ def test_mnist_v0():
     ]
 
 
-@pytest.mark.parametrize("config", [ConfigV0])
+@pytest.mark.parametrize("config", [ConfigV0()])
 def test_mnist_similarity(config):
     # Full training dataset
     d0 = TorchVisionDataset(train_data)

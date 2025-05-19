@@ -116,7 +116,7 @@ class CSVDataset(Dataset):
         ):
             # Read from static file
             self.csv_data = open(csv_data, "r", newline="\n")
-            self.name = str(csv_data)
+            self._name = str(csv_data)
         else:
             # Already a list or iterable of rows
             self.csv_data = csv_data
@@ -128,6 +128,11 @@ class CSVDataset(Dataset):
         if isinstance(self.csv_data, io.IOBase):
             # If data came from a file we opened, close the file
             self.csv_data.close()
+
+    @property
+    def name(self) -> str:
+        """Name identifying the dataset"""
+        return self.name
 
     @property
     def data_points(self) -> Generator[bytes, None, None]:
@@ -149,12 +154,12 @@ class CSVDataset(Dataset):
 class CanonicalDataset:
     """A format agnostic canonical dataset representation to compute fingerprints"""
 
-    def __init__(self, dataset: Dataset, config=ConfigV0):
+    def __init__(self, dataset: Dataset, config=None):
         self.data_point_hashes: List[bytes] = []
         self._uid: Optional[DatasetUID] = None
         self._fingerprint: Optional[DatasetFingerprint] = None
         self.preprocessed: bool = False
-        self.config = config
+        self.config = config if config else ConfigV0()
 
         for d in dataset.data_points:
             self.add_data_point(d)
