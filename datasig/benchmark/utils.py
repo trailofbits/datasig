@@ -3,6 +3,7 @@ from contextlib import contextmanager
 from typing import Callable
 from datasig.dataset import CanonicalDataset, DatasetFingerprint
 
+
 # NOTE(boyan): taken from https://stackoverflow.com/questions/33987060/python-context-manager-that-measures-time
 @contextmanager
 def catchtime() -> Callable[[], float]:
@@ -14,6 +15,8 @@ def catchtime() -> Callable[[], float]:
 
 # Method used to generate the fingerprint
 FingerprintMethod = Callable[[CanonicalDataset], DatasetFingerprint]
+
+
 # Wrap basic fingerprint generation
 def BASIC_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
     return dataset.fingerprint
