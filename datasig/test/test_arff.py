@@ -14,7 +14,7 @@ arff_file = download_file(
 
 def test_arff_v0():
     dataset = ARFFDataset(arff_file)
-    canonical = CanonicalDataset(dataset, config=ConfigV0)
+    canonical = CanonicalDataset(dataset, config=ConfigV0())
     # Test UID and fingerprint
     print(canonical.uid)
     assert (
@@ -429,7 +429,7 @@ def test_arff_v0():
     ]
 
 
-@pytest.mark.parametrize("config", [ConfigV0])
+@pytest.mark.parametrize("config", [ConfigV0()])
 def test_similarity(config):
     data1 = extract_arff_range(arff_file, 0, 5000, "/tmp/data1.arff")
     data2 = extract_arff_range(arff_file, 5000, 10000, "/tmp/data2.arff")
