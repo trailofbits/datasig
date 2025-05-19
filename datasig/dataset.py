@@ -48,6 +48,10 @@ class TorchVisionDataset(Dataset):
         super().__init__(DatasetType.TORCH)
         self.dataset = dataset
 
+    def __len__(self) -> int:
+        """Return the number of data points in the dataset"""
+        return len(self.dataset)
+
     @property
     def name(self) -> str:
         """Name identifying the dataset"""

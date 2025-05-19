@@ -2,6 +2,7 @@ from datasig.benchmark import Benchmark, BenchmarkConfig, BASIC_FINGERPRINT
 from torchvision.datasets import MNIST
 from datasig.config import ConfigV0
 from datasig.dataset import TorchVisionDataset
+from datasig.benchmark import AccuracyConfig
 
 # Example benchmark run on the MNIST dataset
 def main():
@@ -19,6 +20,16 @@ def main():
             methods=[BASIC_FINGERPRINT],
             # Configs to benchmark with
             configs={"default": ConfigV0()},
+            # How to test fingerprint accuracy. Only needed if measure_accuracy is True
+            accuracy_config=AccuracyConfig(
+                min_subset_size=1000,
+                max_subset_size=3000,
+                n_samples=10,
+            ),
+            # Whether to measure fingerprint generation time
+            measure_time=True,
+            # Whether to measure fingerprint accuracy
+            measure_accuracy=True,
         ),
     )
 

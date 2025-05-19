@@ -3,13 +3,8 @@ from ..dataset import Dataset, DatasetType, CanonicalDataset
 from typing import List, Dict, Callable, Optional, Any
 from enum import StrEnum
 from ..fingerprint import DatasetFingerprint
-from .utils import catchtime
-
-FingerprintMethod = Callable[[CanonicalDataset], DatasetFingerprint]
-
-
-def BASIC_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
-    return dataset.fingerprint
+from .utils import catchtime, FingerprintMethod
+from .accuracy import AccuracyConfig, FingerprintAccuracyRandomTester
 
 
 @dataclass
@@ -32,7 +27,7 @@ class BenchmarkResult:
     time_canonization: Optional[float] = None
     time_fingerprint: Optional[float] = None
     # Accuracy measurements
-    similarity_accuracy: Optional[float] = None
+    accuracy_error: Optional[float] = None
 
     def __str__(self):
         res = ""
@@ -41,8 +36,8 @@ class BenchmarkResult:
             res += f"  Time canonization: {self.time_canonization}\n"
         if self.time_fingerprint is not None:
             res += f"  Time fingerprint: {self.time_fingerprint}\n"
-        if self.similarity_accuracy is not None:
-            res += f"  Similarity accuracy: {self.similarity_accuracy}\n"
+        if self.accuracy_error is not None:
+            res += f"  Accuracy error: {self.accuracy_error}\n"
         return res
 
 
@@ -65,8 +60,13 @@ class BenchmarkResults:
 # in a separate file... (because diff than normal benchmark)
 @dataclass
 class BenchmarkConfig:
+    # Configuration of the benchmark
     methods: List[FingerprintMethod]
     configs: Dict[str, Config]  # config_name -> config
+    accuracy_config: Optional[AccuracyConfig] = None  # used only if measure_accuracy is True
+    # Which metrics to measure
+    measure_time: bool = True
+    measure_accuracy: bool = False
 
 
 @dataclass
@@ -82,16 +82,30 @@ class Benchmark:
             # With each fingerprint method and supplied config(s)
             for method in self.config.methods:
                 for config_name, config in self.config.configs.items():
-                    res = self._benchmark_fingerprint(dataset, method, config)
-                    res.config_name = config_name
+                    res = BenchmarkResult(
+                        dataset_info=DatasetInfo(dataset.name, dataset.type),
+                        fingerprint_method=method.__name__,
+                        config_name=config_name,
+                    )
+                    if self.config.measure_time:
+                        canonization_time, fingerprint_time = self._benchmark_fingerprint(
+                            dataset, method, config
+                        )
+                        res.time_canonization = canonization_time
+                        res.time_fingerprint = fingerprint_time
+                    # Optionally measure fingerprint accuracy
+                    if self.config.measure_accuracy:
+                        res.accuracy_error = FingerprintAccuracyRandomTester(
+                            dataset, method, config, self.config.accuracy_config
+                        ).run()
                     results.add(res)
         return results
 
     def _benchmark_fingerprint(
         self, dataset: Dataset, fingerprint_method: FingerprintMethod, config: Config
-    ) -> BenchmarkResult:
+    ) -> tuple[float, float]:
         """Benchmark the time needed to generate a fingerprint for a dataset with a given
-        fingerprint method and one or several configurations"""
+        fingerprint method and one configuration"""
         # TODO(boyan): we could factorize the canonization step. Technically
         # we use the same canonical dataset for each config, and potentially
         # for each fingerprint method even. Canonizing only once could
@@ -101,9 +115,4 @@ class Benchmark:
             c_dataset = CanonicalDataset(dataset, config=config)
         with catchtime() as fingerprint_time:
             fingerprint = fingerprint_method(c_dataset)
-        return BenchmarkResult(
-            dataset_info=DatasetInfo(dataset.name, dataset.type),
-            fingerprint_method=fingerprint_method.__name__,
-            time_canonization=canonization_time(),
-            time_fingerprint=fingerprint_time(),
-        )
+        return canonization_time(), fingerprint_time()
