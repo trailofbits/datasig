@@ -1,6 +1,4 @@
 import itertools
-import numpy
-import weave
 
 
 def range_data(data, start_offset: int, end_offset: int):
