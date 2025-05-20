@@ -11,6 +11,7 @@ from torchvision.datasets import MNIST
 from datasig.config import ConfigV0
 from datasig.dataset import TorchVisionDataset
 
+
 # Example benchmark run on the MNIST dataset
 def main():
     # Get datasets to benchmark on
