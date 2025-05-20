@@ -20,3 +20,15 @@ FingerprintMethod = Callable[[CanonicalDataset], DatasetFingerprint]
 # Wrap basic fingerprint generation
 def BASIC_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
     return dataset.fingerprint
+
+
+def XOR_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
+    return dataset.xor_fingerprint
+
+
+def SINGLE_SHA_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
+    return dataset.single_sha_fingerprint
+
+
+def DATASKETCH_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
+    return dataset.datasketch_fingerprint

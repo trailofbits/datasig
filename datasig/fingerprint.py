@@ -3,6 +3,7 @@ from typing import List
 import math
 from abc import ABC, abstractmethod
 import string
+import datasketch
 
 
 class DatasetUID(bytes):
@@ -53,4 +54,26 @@ class BasicDatasetFingerprint(DatasetFingerprint):
     def comparison_accuracy(self) -> float:
         if self.signatures:
             return 1.0 - (1.0 / math.sqrt(len(self.signatures)))
+        return 0.0
+
+
+class DatasketchFingerprint(DatasetFingerprint):
+    """A fingerprint that stores a minhash object from the
+    datasketch library"""
+
+    def __init__(self, minhash: datasketch.MinHash):
+        self.minhash = minhash
+
+    def __len__(self):
+        return len(self.minhash)
+
+    def similarity(self, other: "DatasketchFingerprint"):
+        return self.minhash.jaccard(other.minhash)
+
+    def comparison_accuracy(self) -> float:
+        # TODO(boyan): make sure ysing the length of the minhash
+        # is correct for estimating the accuracy here
+        l = len(self.minhash)
+        if l:
+            return 1.0 - (1.0 / math.sqrt(l))
         return 0.0
