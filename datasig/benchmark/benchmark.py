@@ -10,6 +10,7 @@ from typing import TextIO
 from io import StringIO
 from .plot import plot_results, plot_results2
 from ..logger import logger
+import uuid
 
 
 @dataclass
@@ -87,6 +88,10 @@ class BenchmarkResults:
         print(res.getvalue())
         return res.getvalue()
 
+    def dump_csv(self, path: str):
+        with open(path, "w") as f:
+            f.write(self.to_csv())
+
     # TODO(boyan): this plots the fingerprint time by default. Add other
     # metrics later
     def plot(self):
@@ -112,6 +117,8 @@ class Benchmark:
 
     def run(self) -> BenchmarkResults:
         results = BenchmarkResults(results=[])
+        # Temp file to store benchmark results as we go
+        tmp_res_file = f"/tmp/{str(uuid.uuid4())[:8]}_datasig_benchmark.csv"
         # Benchmark each dataset
         for dataset in self.datasets:
             # With each fingerprint method and supplied config(s)
@@ -145,6 +152,8 @@ class Benchmark:
                             ).run()
                             logger.info("Done measuring fingerprint accuracy")
                         results.add(res)
+                        logger.info("Dumping temporary benchmark results to file %s", tmp_res_file)
+                        results.dump_csv(tmp_res_file)
                     except KeyboardInterrupt:
                         logger.warning("Benchmark case interrupted")
                         continue
