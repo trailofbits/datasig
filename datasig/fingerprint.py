@@ -71,7 +71,7 @@ class DatasketchFingerprint(DatasetFingerprint):
         return self.minhash.jaccard(other.minhash)
 
     def comparison_accuracy(self) -> float:
-        # TODO(boyan): make sure ysing the length of the minhash
+        # TODO(boyan): make sure using the length of the minhash
         # is correct for estimating the accuracy here
         l = len(self.minhash)
         if l:

@@ -89,6 +89,10 @@ class ARFFDataset(Dataset):
         super().__init__(DatasetType.ARFF)
         self.arff_file = arff_file
 
+    def __len__(self) -> int:
+        """Return the number of data points in the dataset"""
+        return sum(1 for _ in self.data_points)
+
     @property
     def name(self) -> str:
         """Name identifying the dataset"""
@@ -113,6 +117,8 @@ class CSVDataset(Dataset):
         self, csv_data: Union[Iterable[str], List[str], Path, str], dialect="excel", **fmtparams
     ):
         super().__init__(DatasetType.CSV)
+        self.dialect = dialect
+        self.fmtparams = fmtparams
         if isinstance(
             csv_data,
             (
@@ -127,7 +133,7 @@ class CSVDataset(Dataset):
             # Already a list or iterable of rows
             self.csv_data = csv_data
             # TODO(boyan): proper naming here needs to come from the user
-            self.name = "Raw CSV data supplied from python"
+            self._name = "Raw CSV data supplied from python"
         self.csv_reader = csv.reader(self.csv_data, dialect=dialect, **fmtparams)
 
     def __del__(self):
@@ -138,7 +144,7 @@ class CSVDataset(Dataset):
     @property
     def name(self) -> str:
         """Name identifying the dataset"""
-        return self.name
+        return self._name
 
     @property
     def data_points(self) -> Generator[bytes, None, None]:
@@ -274,7 +280,7 @@ class CanonicalDataset:
         self._check_preprocess()
         FP_KEY = "DATASKETCH"
         if FP_KEY not in self._fingerprints:
-            res = datasketch.MinHash(num_perm=self.config.datasketch_num_perm)
+            res = datasketch.MinHash(num_perm=self.config.nb_signatures)
             for d in self.data_point_hashes:
                 res.update(d)
             self._fingerprints[FP_KEY] = DatasketchFingerprint(res)
