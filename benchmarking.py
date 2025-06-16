@@ -13,7 +13,7 @@ from datasig.dataset import TorchVisionDataset, ARFFDataset
 from datasig.test.utils import download_file
 
 
-# Example benchmark run on the MNIST dataset
+# Example benchmark run
 def main():
     # Get datasets to benchmark on
     data = MNIST(root="/tmp/mnist_data", train=True, download=True)
@@ -27,7 +27,7 @@ def main():
 
     # Configure benchmark
     benchmark = Benchmark(
-        name="Test benchmark on MNIST",
+        name="Example benchmark",
         # Datasets to benchmark on
         datasets=[
             dataset_1,
@@ -41,7 +41,8 @@ def main():
                 SINGLE_SHA_FINGERPRINT,
                 DATASKETCH_FINGERPRINT,
             ],
-            # Configs to benchmark with
+            # Configs to benchmark with. Keys are the name of the config as it
+            # will appear in the results
             configs={"default": ConfigV0()},
             # How to test fingerprint accuracy. Only needed if measure_accuracy is True
             accuracy_config=AccuracyConfig(
@@ -58,8 +59,8 @@ def main():
 
     # Run the benchmark
     results = benchmark.run()
-    print(results)
-    results.plot()
+    print(results)  # Pretty print results in terminal
+    results.plot()  # Plot results in histogram format
 
 
 if __name__ == "__main__":

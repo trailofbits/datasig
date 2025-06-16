@@ -54,3 +54,14 @@ python3 profiling.py torch_mnist -v 0 --all
 
 Currently we support only one target dataset: `torch_mnist`. To add another dataset, add a class in `profiling.py` similar to `TorchMNISTV0`, that implements the `_setup()` method which is responsible for loading the dataset.
 
+### Benchmarking
+Datasig has a built-in `benchmark` module that allows to run experiments to benchmark speed and accuracy of various fingerprinting methods with varying configurations and on several datasets.
+
+Benchmarks are configured programmatically using the `datasig` library directly.
+The `benchmarking.py` script gives a comprehensive overview of how to configure and run a benchmark, export results, as well as plot them on graph.
+
+You can run the example benchmark with
+
+```bash
+python3 benchmarking.py
+```
