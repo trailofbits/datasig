@@ -1,6 +1,6 @@
 from time import process_time
 from contextlib import contextmanager
-from typing import Callable
+from typing import Callable, Any
 from datasig.dataset import CanonicalDataset, DatasetFingerprint
 import arff
 
@@ -15,24 +15,24 @@ def catchtime() -> Callable[[], float]:
 
 
 # Method used to generate the fingerprint
-FingerprintMethod = Callable[[CanonicalDataset], DatasetFingerprint]
+FingerprintMethod = Callable[[CanonicalDataset, Any], DatasetFingerprint]
 
 
 # Wrap basic fingerprint generation
-def BASIC_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
-    return dataset.fingerprint
+def BASIC_FINGERPRINT(dataset: CanonicalDataset, config: Any) -> DatasetFingerprint:
+    return dataset._fingerprint(config)
 
 
-def XOR_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
-    return dataset.xor_fingerprint
+def XOR_FINGERPRINT(dataset: CanonicalDataset, config: Any) -> DatasetFingerprint:
+    return dataset._xor_fingerprint(config)
 
 
-def SINGLE_SHA_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
-    return dataset.single_sha_fingerprint
+def SINGLE_SHA_FINGERPRINT(dataset: CanonicalDataset, config: Any) -> DatasetFingerprint:
+    return dataset._single_sha_fingerprint(config)
 
 
-def DATASKETCH_FINGERPRINT(dataset: CanonicalDataset) -> DatasetFingerprint:
-    return dataset.datasketch_fingerprint
+def DATASKETCH_FINGERPRINT(dataset: CanonicalDataset, config: Any) -> DatasetFingerprint:
+    return dataset._datasketch_fingerprint(config)
 
 
 def extract_arff_indices(arff_file: "str", indices: set[int], outfile: str) -> str:

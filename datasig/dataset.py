@@ -172,7 +172,7 @@ class CanonicalDataset:
         # Fingerprints computed with different methods
         self._fingerprints: Dict[str, DatasetFingerprint] = dict()
         self.preprocessed: bool = False
-        self.config = config if config else ConfigV0()
+        self.default_config = config if config else ConfigV0()
 
         for d in dataset.data_points:
             self.add_data_point(d)
@@ -209,6 +209,10 @@ class CanonicalDataset:
 
     @property
     def fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint using the default configuration"""
+        return self._fingerprint()
+
+    def _fingerprint(self, config=None) -> DatasetFingerprint:
         """Generate dataset fingerprint using the keyed SHA method.
 
         The figerprint is computed using the MinHash scheme.
@@ -218,11 +222,13 @@ class CanonicalDataset:
         """
         self._check_preprocess()
         FP_KEY = "KEYED_SHA"
+        if config is None:
+            config = self.default_config
         if FP_KEY not in self._fingerprints:
             res = [None] * 400
-            for i in range(self.config.nb_signatures):
+            for i in range(config.nb_signatures):
                 for h in self.data_point_hashes:
-                    h2 = hashlib.sha256(h + self.config.lsh_magic_numbers[i]).digest()
+                    h2 = hashlib.sha256(h + config.lsh_magic_numbers[i]).digest()
                     if res[i] is None or res[i] > h2:
                         res[i] = h2
             self._fingerprints[FP_KEY] = BasicDatasetFingerprint(res)
@@ -230,6 +236,10 @@ class CanonicalDataset:
 
     @property
     def xor_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint using the default configuration"""
+        return self._xor_fingerprint()
+
+    def _xor_fingerprint(self) -> DatasetFingerprint:
         """Generate dataset fingerprint based on XOR permutations.
 
         The figerprint is computed using the MinHash scheme.
@@ -237,12 +247,14 @@ class CanonicalDataset:
         """
         self._check_preprocess()
         FP_KEY = "XOR"
+        if config is None:
+            config = self.default_config
         if FP_KEY not in self._fingerprints:
             res = [None] * 400
-            for i in range(self.config.nb_signatures):
+            for i in range(config.nb_signatures):
                 for h in self.data_point_hashes:
                     # Bitwise XOR with the magic number
-                    h2 = [a ^ b for a, b in zip(h, self.config.xor_magic_numbers[i])]
+                    h2 = [a ^ b for a, b in zip(h, config.xor_magic_numbers[i])]
                     if res[i] is None or res[i] > h2:
                         res[i] = h2
             res = [bytes(x) for x in res]
@@ -251,6 +263,10 @@ class CanonicalDataset:
 
     @property
     def single_sha_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint using the default configuration"""
+        return self._single_sha_fingerprint()
+
+    def _single_sha_fingerprint(self, config=None) -> DatasetFingerprint:
         """Generate dataset fingerprint based on a single SHA permutation
 
         The figerprint is computed using the MinHash scheme with a single permutation approximated by SHA256.
@@ -260,14 +276,20 @@ class CanonicalDataset:
         """
         self._check_preprocess()
         FP_KEY = "SINGLE_SHA"
+        if config is None:
+            config = self.default_config
         if FP_KEY not in self._fingerprints:
             # Relies on the fact that the data point hashes are sorted
-            res = self.data_point_hashes[: self.config.nb_signatures]
+            res = self.data_point_hashes[: config.nb_signatures]
             self._fingerprints[FP_KEY] = BasicDatasetFingerprint(res)
         return self._fingerprints[FP_KEY]
 
     @property
     def datasketch_fingerprint(self) -> DatasetFingerprint:
+        """Generate dataset fingerprint using the default configuration"""
+        return self._datasketch_fingerprint()
+
+    def _datasketch_fingerprint(self, config=None) -> DatasetFingerprint:
         """Generate dataset fingerprint based on universal hashing permutations
 
         The figerprint is computed using the MinHash scheme.
@@ -279,8 +301,10 @@ class CanonicalDataset:
         """
         self._check_preprocess()
         FP_KEY = "DATASKETCH"
+        if config is None:
+            config = self.default_config
         if FP_KEY not in self._fingerprints:
-            res = datasketch.MinHash(num_perm=self.config.nb_signatures)
+            res = datasketch.MinHash(num_perm=config.nb_signatures)
             for d in self.data_point_hashes:
                 res.update(d)
             self._fingerprints[FP_KEY] = DatasketchFingerprint(res)

@@ -4,7 +4,7 @@ from typing import List, Dict, Callable, Optional, Any
 from enum import StrEnum
 from ..fingerprint import DatasetFingerprint
 from .utils import catchtime, FingerprintMethod
-from .accuracy import AccuracyConfig, FingerprintAccuracyRandomTester
+from .accuracy import AccuracyConfig, FingerprintAccuracyRandomTester, SubsetCache
 import csv
 from typing import TextIO
 from io import StringIO
@@ -85,7 +85,6 @@ class BenchmarkResults:
                     result.accuracy_error,
                 ]
             )
-        print(res.getvalue())
         return res.getvalue()
 
     def dump_csv(self, path: str):
@@ -117,6 +116,10 @@ class Benchmark:
 
     def run(self) -> BenchmarkResults:
         results = BenchmarkResults(results=[])
+        # This cache is used to store subsets of datasets that used in the
+        # benchmark and speed up the accuracy measurements by generating them
+        # only once instead of generating them for each benchmark case.
+        subsets_cache = SubsetCache(self.config.accuracy_config)
         # Temp file to store benchmark results as we go
         tmp_res_file = f"/tmp/{str(uuid.uuid4())[:8]}_datasig_benchmark.csv"
         # Benchmark each dataset
@@ -148,7 +151,7 @@ class Benchmark:
                         if self.config.measure_accuracy:
                             logger.info("Start measuring fingerprint accuracy")
                             res.accuracy_error = FingerprintAccuracyRandomTester(
-                                dataset, method, config, self.config.accuracy_config
+                                dataset, method, config, self.config.accuracy_config, subsets_cache
                             ).run()
                             logger.info("Done measuring fingerprint accuracy")
                         results.add(res)
@@ -178,5 +181,5 @@ class Benchmark:
                 dataset.name,
                 fingerprint_method.__name__,
             )
-            fingerprint = fingerprint_method(c_dataset)
+            fingerprint = fingerprint_method(c_dataset, config)
         return canonization_time(), fingerprint_time()
