@@ -21,3 +21,6 @@ class ConfigV0:
     xor_magic_numbers: List[bytes] = field(
         default_factory=gen_xor_magic_numbers,
     )
+
+    def __str__(self):
+        return f"ConfigV0(nb_signatures={self.nb_signatures}, lsh_magic_numbers={self.lsh_magic_numbers[0:2]}..., xor_magic_numbers={self.xor_magic_numbers[0:2]}...)"

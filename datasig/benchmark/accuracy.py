@@ -12,6 +12,7 @@ import torch
 from typing import Any
 from .utils import FingerprintMethod, extract_arff_indices
 import tempfile
+from ..logger import logger
 
 
 @dataclass
@@ -89,6 +90,8 @@ class FingerprintAccuracyRandomTester:
         file_b = tempfile.NamedTemporaryFile(suffix=".arff").name
         extract_arff_indices(self.dataset.arff_file, indices_a, file_a)
         extract_arff_indices(self.dataset.arff_file, indices_b, file_b)
+        logger.debug("Extracted ARFF subset in %s", file_a)
+        logger.debug("Extracted ARFF subset in %s", file_b)
         subset_a = CanonicalDataset(ARFFDataset(file_a), config=self.fingerprint_config)
         subset_b = CanonicalDataset(ARFFDataset(file_b), config=self.fingerprint_config)
 
@@ -101,7 +104,10 @@ class FingerprintAccuracyRandomTester:
 
         It returns the average error over the number of tests. The lesser the better."""
 
-        results = [self.one_random_accuracy_test() for _ in range(self.config.n_samples)]
+        results = []
+        for i in range(self.config.n_samples):
+            logger.info(f"Starting random accuracy test {i+1}/{self.config.n_samples}")
+            results.append(self.one_random_accuracy_test())
         # Return average error
         return sum(results) / len(results)
 
