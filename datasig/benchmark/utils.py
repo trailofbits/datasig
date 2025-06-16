@@ -4,6 +4,7 @@ from typing import Callable
 from datasig.dataset import CanonicalDataset, DatasetFingerprint
 import arff
 
+
 # NOTE(boyan): taken from https://stackoverflow.com/questions/33987060/python-context-manager-that-measures-time
 @contextmanager
 def catchtime() -> Callable[[], float]:

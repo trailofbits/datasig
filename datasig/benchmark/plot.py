@@ -96,9 +96,8 @@ def plot_results(csv_data: TextIO, key="time_fingerprint"):
                         hovertemplate="Dataset: %{customdata}<br>Method: "
                         + method
                         + "<br>Time: %{y}<extra></extra>",
-                        showlegend=True
-                        if config_idx == 0
-                        else False,  # Only show legend for the first config
+                        # Only show legend for the first config
+                        showlegend=True if config_idx == 0 else False,
                     ),
                     row=config_idx + 1,
                     col=1,
