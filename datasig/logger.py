@@ -1,6 +1,7 @@
 import logging
 import sys
 
+
 # From https://stackoverflow.com/a/56944256
 class ColoredFormatter(logging.Formatter):
 
