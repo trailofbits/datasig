@@ -117,33 +117,37 @@ class Benchmark:
             # With each fingerprint method and supplied config(s)
             for method in self.config.methods:
                 for config_name, config in self.config.configs.items():
-                    logger.info(
-                        "Running benchmark case: %s %s %s",
-                        dataset.name,
-                        method.__name__,
-                        config_name,
-                    )
-                    res = BenchmarkResult(
-                        dataset_info=DatasetInfo(dataset.name, dataset.type),
-                        fingerprint_method=method.__name__,
-                        config_name=config_name,
-                    )
-                    if self.config.measure_time:
-                        logger.info("Start measuring fingerprinting time")
-                        canonization_time, fingerprint_time = self._benchmark_fingerprint(
-                            dataset, method, config
+                    try:
+                        logger.info(
+                            "Running benchmark case: %s %s %s",
+                            dataset.name,
+                            method.__name__,
+                            config_name,
                         )
-                        res.time_canonization = canonization_time
-                        res.time_fingerprint = fingerprint_time
-                        logger.info("Done measuring fingerprinting time")
-                    # Optionally measure fingerprint accuracy
-                    if self.config.measure_accuracy:
-                        logger.info("Start measuring fingerprint accuracy")
-                        res.accuracy_error = FingerprintAccuracyRandomTester(
-                            dataset, method, config, self.config.accuracy_config
-                        ).run()
-                        logger.info("Done measuring fingerprint accuracy")
-                    results.add(res)
+                        res = BenchmarkResult(
+                            dataset_info=DatasetInfo(dataset.name, dataset.type),
+                            fingerprint_method=method.__name__,
+                            config_name=config_name,
+                        )
+                        if self.config.measure_time:
+                            logger.info("Start measuring fingerprinting time")
+                            canonization_time, fingerprint_time = self._benchmark_fingerprint(
+                                dataset, method, config
+                            )
+                            res.time_canonization = canonization_time
+                            res.time_fingerprint = fingerprint_time
+                            logger.info("Done measuring fingerprinting time")
+                        # Optionally measure fingerprint accuracy
+                        if self.config.measure_accuracy:
+                            logger.info("Start measuring fingerprint accuracy")
+                            res.accuracy_error = FingerprintAccuracyRandomTester(
+                                dataset, method, config, self.config.accuracy_config
+                            ).run()
+                            logger.info("Done measuring fingerprint accuracy")
+                        results.add(res)
+                    except KeyboardInterrupt:
+                        logger.warning("Benchmark case interrupted")
+                        continue
         return results
 
     def _benchmark_fingerprint(
