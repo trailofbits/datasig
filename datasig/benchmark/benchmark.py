@@ -5,6 +5,10 @@ from enum import StrEnum
 from ..fingerprint import DatasetFingerprint
 from .utils import catchtime, FingerprintMethod
 from .accuracy import AccuracyConfig, FingerprintAccuracyRandomTester
+import csv
+from typing import TextIO
+from io import StringIO
+from .plot import plot_results, plot_results2
 
 
 @dataclass
@@ -55,6 +59,38 @@ class BenchmarkResults:
             res += str(result) + "\n"
         return res
 
+    def to_csv(self) -> str:
+        res = StringIO()
+        writer = csv.writer(res)
+        writer.writerow(
+            [
+                "dataset",
+                "fingerprint_method",
+                "config_name",
+                "time_canonization",
+                "time_fingerprint",
+                "accuracy_error",
+            ]
+        )
+        for result in self.results:
+            writer.writerow(
+                [
+                    result.dataset_info.name,
+                    result.fingerprint_method,
+                    result.config_name,
+                    result.time_canonization,
+                    result.time_fingerprint,
+                    result.accuracy_error,
+                ]
+            )
+        print(res.getvalue())
+        return res.getvalue()
+
+    # TODO(boyan): this plots the fingerprint time by default. Add other
+    # metrics later
+    def plot(self):
+        return plot_results2(StringIO(self.to_csv()))
+
 
 # TODO(boyan): add whether to measure accuracy to or not??? Maybe
 # in a separate file... (because diff than normal benchmark)
@@ -82,6 +118,7 @@ class Benchmark:
             # With each fingerprint method and supplied config(s)
             for method in self.config.methods:
                 for config_name, config in self.config.configs.items():
+                    print("Running benchmark for ", dataset.name, method.__name__, config_name)
                     res = BenchmarkResult(
                         dataset_info=DatasetInfo(dataset.name, dataset.type),
                         fingerprint_method=method.__name__,

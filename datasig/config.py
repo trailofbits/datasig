@@ -21,4 +21,3 @@ class ConfigV0:
     xor_magic_numbers: List[bytes] = field(
         default_factory=gen_xor_magic_numbers,
     )
-    datasketch_num_perm: int = 128
