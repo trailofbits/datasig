@@ -4,6 +4,7 @@ from ..config import ConfigV0
 from .utils import assert_fingerprint_similarity
 import pytest
 import itertools
+from PIL import ImageChops
 
 # TODO(boyan): use properly generated tmp directories with tempfile
 train_data = MNIST(root="/tmp/mnist_data", train=True, download=True)
@@ -448,3 +449,19 @@ def test_mnist_similarity(config):
     # Ratio if 60000+10000 = 70000 vs. 10000 data points
     # Expected similarity is 1/7 ~= 0.1428
     assert_fingerprint_similarity(c2, c3, 0.1428)
+
+
+def test_serialization():
+    dataset = TorchVisionDataset(test_data)
+    d = dataset[0]
+    serialized = dataset.serialize_data_point(d)
+    deserialized = dataset.deserialize_data_point(serialized)
+
+    assert(d.mode == deserialized.mode)
+    assert(d.size == deserialized.size)
+
+    # Compare images using the PIL library directly
+    diff = ImageChops.difference(d, deserialized)
+    # If they are identical, getbbox should return None/False
+    assert(not diff.getbbox())
+
