@@ -448,3 +448,11 @@ def test_similarity(config):
     assert_fingerprint_similarity(c1, c2, 0.0)
     # 1/3th in common
     assert_fingerprint_similarity(c3, c4, 0.33)
+
+
+def test_serialization():
+    dataset = CSVDataset(csv_file, delimiter=",")
+    d = dataset[12]
+    serialized = dataset.serialize_data_point(d)
+    deserialized = dataset.deserialize_data_point(serialized)
+    assert(d == deserialized)
