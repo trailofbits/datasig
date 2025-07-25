@@ -455,7 +455,7 @@ def test_serialization():
     dataset = TorchVisionDataset(test_data)
     d = dataset[0]
     serialized = dataset.serialize_data_point(d)
-    deserialized = dataset.deserialize_data_point(serialized)
+    deserialized = TorchVisionDataset.deserialize_data_point(serialized)
 
     assert(d.mode == deserialized.mode)
     assert(d.size == deserialized.size)

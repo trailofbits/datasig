@@ -8,6 +8,7 @@ python3 -m pip install .
 ```
 
 ## Usage
+### Fingerprinting
 The code below shows experimental usage of the library.
 This will be subject to frequent changes in early development stages. 
 
@@ -21,6 +22,52 @@ canonical = CanonicalDataset(dataset)
 print("Dataset UID: ", canonical.uid)
 print("Dataset fingerprint: ", canonical.fingerprint)
 ```
+
+### Dynamic dataset streaming
+Datasig can be used in AIBOM solutions that require data to be streamed
+dynamically. Here is how to use it, using the MNIST example
+
+On the server side (acquire and serve data):
+
+```python
+from torchvision.datasets import MNIST
+from datasig.dataset import TorchVisionDataset, CanonicalDataset
+from datasig.streaming import StreamedDataset
+
+# Create dataset and wrap with StreamedDataset
+torch_dataset = MNIST(root="/tmp/data", train=True, download=True)
+stream = StreamedDataset(TorchVisionDataset(torch_dataset))
+
+# Option 1: Iterative data point access
+for data_point in stream:
+    pass
+
+# Option 2: Index-based data point access
+data_point = stream[10]
+
+# Serializing data points to bytes and serve
+x = stream.serialize_data_point(data_point)
+your_send_data_function(x)
+
+# Once done streaming, compute fingerprint
+canonical = CanonicalDataset(stream)
+print("Dataset fingerprint: ", canonical.fingerprint)
+```
+
+On the client side (receive, deserialize, and use the data):
+
+```python
+from datasig.dataset import TorchVisionDataset
+
+# Get data sent by the server side
+data: bytes = your_receive_data_function()
+
+# Deserialize data to get proper python object
+data_point = TorchVisionDataset.deserialize_data_point(data)
+
+# Do something with the data...
+```
+
 
 ## Development
 ### Unit tests

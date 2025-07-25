@@ -455,6 +455,6 @@ def test_serialization():
     dataset = ARFFDataset(arff_file)
     d = "A, 1234, Test data"
     serialized = dataset.serialize_data_point(d)
-    deserialized = dataset.deserialize_data_point(serialized)
+    deserialized = ARFFDataset.deserialize_data_point(serialized)
 
     assert(d == deserialized)

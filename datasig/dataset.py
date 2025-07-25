@@ -61,16 +61,18 @@ class Dataset(ABC):
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def serialize_data_point(self, data: Any) -> bytes:
+    def serialize_data_point(data: Any) -> bytes:
         """
         Serialize a data point into bytes for it to be transmitted over
         a network interface
         """
         pass
 
+    @staticmethod
     @abstractmethod
-    def deserialize_data_point(self, data: bytes) -> Any:
+    def deserialize_data_point(data: bytes) -> Any:
         """
         Instantiate a data point from bytes that were generated using
         the `serialize_data_point` method
@@ -114,16 +116,23 @@ class TorchVisionDataset(Dataset):
         else:
             raise Exception(f"Unsupported data point type: {type(data)}")
 
-    def _PIL_image_to_bytes_v0(self, data: Image.Image) -> bytes:
+    @staticmethod
+    def _PIL_image_to_bytes_v0(data: Image.Image) -> bytes:
         # Return raw image data
         return data.tobytes(encoder_name="raw")
 
-    def serialize_data_point(self, data: Image) -> bytes:
+    @staticmethod
+    def serialize_data_point(data: Image) -> bytes:
         return json.dumps(
-            [data.mode, data.size, base64.b64encode(self._PIL_image_to_bytes_v0(data)).decode()]
+            [
+                data.mode,
+                data.size,
+                base64.b64encode(TorchVisionDataset._PIL_image_to_bytes_v0(data)).decode(),
+            ]
         )
 
-    def deserialize_data_point(self, data: bytes) -> Image.Image:
+    @staticmethod
+    def deserialize_data_point(data: bytes) -> Image.Image:
         mode, size, raw_bytes = json.loads(data)
         return Image.frombytes(mode, size, base64.b64decode(raw_bytes.encode()), decoder_name="raw")
 
@@ -165,11 +174,13 @@ class ARFFDataset(Dataset):
         else:
             raise Exception(f"Unsupported data point type: {type(data)}")
 
-    def serialize_data_point(self, data: bytes) -> bytes:
+    @staticmethod
+    def serialize_data_point(data: bytes) -> bytes:
         # Data is already bytes
         return data
 
-    def deserialize_data_point(self, data: bytes) -> bytes:
+    @staticmethod
+    def deserialize_data_point(data: bytes) -> bytes:
         return data
 
 
@@ -244,10 +255,12 @@ class CSVDataset(Dataset):
         writer.writerow(row)
         return bytes(res.getvalue(), "utf-8")
 
-    def serialize_data_point(self, data: List[str]) -> bytes:
+    @staticmethod
+    def serialize_data_point(data: List[str]) -> bytes:
         return json.dumps(data)
 
-    def deserialize_data_point(self, data: bytes) -> List[str]:
+    @staticmethod
+    def deserialize_data_point(data: bytes) -> List[str]:
         return json.loads(data)
 
 
@@ -281,11 +294,13 @@ class RawDataset(Dataset):
         # Already encoded in bytes
         return data_point
 
-    def serialize_data_point(self, data: bytes) -> bytes:
+    @staticmethod
+    def serialize_data_point(data: bytes) -> bytes:
         # Data is already bytes
         return data
 
-    def deserialize_data_point(self, data: bytes) -> bytes:
+    @staticmethod
+    def deserialize_data_point(data: bytes) -> bytes:
         return data
 
 
