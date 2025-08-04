@@ -14,7 +14,8 @@ This will be subject to frequent changes in early development stages.
 
 ```python
 from torchvision.datasets import MNIST
-from datasig.dataset import TorchVisionDataset, CanonicalDataset
+from datasig.dataset import TorchVisionDataset
+from datasig.canonical import CanonicalDataset
 
 torch_dataset = MNIST(root="/tmp/data", train=True, download=True)
 dataset = TorchVisionDataset(torch_dataset)

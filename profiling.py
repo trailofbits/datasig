@@ -1,6 +1,7 @@
 from torchvision.datasets import MNIST
 from datasig.config import ConfigV0
-from datasig.dataset import CanonicalDataset, Dataset, TorchVisionDataset
+from datasig.dataset import Dataset, TorchVisionDataset
+from datasig.canonical import CanonicalDataset
 import cProfile
 import sys
 import argparse

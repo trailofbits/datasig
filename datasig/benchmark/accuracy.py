@@ -1,11 +1,11 @@
 from torchvision.datasets import MNIST
 from datasig.dataset import (
-    CanonicalDataset,
     Dataset,
     TorchVisionDataset,
     ARFFDataset,
     DatasetType,
 )
+from datasig.canonical import CanonicalDataset
 from datasig.config import *
 import numpy as np
 import torch

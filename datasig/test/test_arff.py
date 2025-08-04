@@ -1,5 +1,6 @@
 from torchvision.datasets import MNIST
-from ..dataset import ARFFDataset, CanonicalDataset
+from ..dataset import ARFFDataset
+from ..canonical import CanonicalDataset
 from ..config import ConfigV0
 from .utils import assert_fingerprint_similarity, download_file, extract_arff_range
 import pytest

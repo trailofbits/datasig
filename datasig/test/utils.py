@@ -1,4 +1,4 @@
-from ..dataset import CanonicalDataset
+from ..canonical import CanonicalDataset
 import requests
 import shutil
 import arff

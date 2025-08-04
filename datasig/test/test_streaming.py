@@ -1,5 +1,6 @@
 from torchvision.datasets import MNIST
-from ..dataset import TorchVisionDataset, CanonicalDataset
+from ..dataset import TorchVisionDataset
+from ..canonical import CanonicalDataset
 from ..streaming import StreamedDataset
 from ..config import ConfigV0
 import pytest

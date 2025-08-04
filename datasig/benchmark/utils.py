@@ -1,7 +1,8 @@
 from time import process_time
 from contextlib import contextmanager
 from typing import Callable, Any
-from datasig.dataset import CanonicalDataset, DatasetFingerprint
+from datasig.dataset import DatasetFingerprint
+from datasig.canonical import CanonicalDataset
 import arff
 
 

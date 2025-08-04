@@ -1,5 +1,6 @@
 from dataclasses import dataclass, asdict
-from ..dataset import Dataset, DatasetType, CanonicalDataset
+from ..dataset import Dataset, DatasetType
+from ..canonical import CanonicalDataset
 from typing import List, Dict, Callable, Optional, Any
 from enum import StrEnum
 from ..fingerprint import DatasetFingerprint

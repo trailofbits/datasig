@@ -1,5 +1,6 @@
 from torchvision.datasets import MNIST
-from ..dataset import TorchVisionDataset, CanonicalDataset
+from ..dataset import TorchVisionDataset
+from ..canonical import CanonicalDataset
 from ..config import ConfigV0
 from .utils import assert_fingerprint_similarity
 import pytest
