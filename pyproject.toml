@@ -28,11 +28,11 @@ dev = [
 ]
 
 [build-system]
-requires = ["setuptools >= 61.0"]
-build-backend = "setuptools.build_meta"
+requires = ["uv_build>=0.7.21,<0.8.0"]
+build-backend = "uv_build"
 
-[tool.setuptools]
-py-modules = ['datasig']
+[tool.uv.build-backend]
+module-root = ""
 
 [tool.black]
 line-length = 100
