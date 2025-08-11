@@ -7,8 +7,10 @@ from .fingerprint import (
     BasicDatasetFingerprint,
 )
 from .dataset import Dataset
-import threading
-from concurrent.futures import ThreadPoolExecutor
+import multiprocessing as mp
+import psutil
+from typing import Optional
+from .config import ConfigV0
 
 
 class CanonicalDataset:
@@ -23,36 +25,35 @@ class CanonicalDataset:
         self.default_config = config if config else ConfigV0()
 
         # Canonize all data points from underlying dataset
-        self._load_all_data_points(dataset)
+        for d in dataset.encoded_data_points:
+            self.add_data_point(d)
+        # self._load_all_data_points(dataset)
 
-    def _load_all_data_points(self, dataset: Dataset, nthreads=8):
-        """Load all data points from the underlying dataset"""
-        # Use ThreadPoolExecutor for automatic thread management
-        def process_data_point(encoded_data: bytes) -> bytes:
-            return self.canonize_data_point(encoded_data)
-
-        hashes = []
-        with ThreadPoolExecutor(max_workers=nthreads, thread_name_prefix="datasig_worker") as executor:
-            # Submit all items to the thread pool
-            futures = [executor.submit(process_data_point, data_point) for data_point in dataset.encoded_data_points]
-
-            # Wait for all to complete and collect results
-            for future in futures:
-                try:
-                    result = future.result()
-                    hashes.append(result)
-                except Exception as e:
-                    print(f"Error processing item: {e}")
-            
-        self.data_point_hashes = hashes
-
-
-    def canonize_data_point(self, data: bytes) -> bytes:
+    @staticmethod
+    def _canonize_data_point(data: bytes) -> bytes:
         return hashlib.sha256(data).digest()
+
+    def _load_all_data_points(self, dataset: Dataset, nthreads: Optional[int] = 1):
+        """Load all data points from the underlying dataset"""
+        if nthreads is None:
+            # Get all available physical cores
+            nthreads = psutil.cpu_count(logical=False)
+        print(f"USING {nthreads} CPUs")
+        hashes = []
+        pool = mp.Pool(processes=nthreads)
+        for d in dataset.encoded_data_points:
+            hashes.append(pool.apply_async(self._canonize_data_point, args=(d,)))
+        pool.close()
+        pool.join()
+        self.data_point_hashes = [r.get() for r in hashes]
+
+        print(f"DEBUG got {len(hashes)} for datapoints {len(dataset)}")
+        print(type(self.data_point_hashes[0]))
+        print(self.data_point_hashes[0])
 
     def add_data_point(self, data: bytes) -> None:
         """Compute the hash of the data point and add it to the list."""
-        self.data_point_hashes.append(self.canonize_data_point(data))
+        self.data_point_hashes.append(self._canonize_data_point(data))
 
     def _preprocess(self):
         """Preprocessing steps required before computing fingerprint"""

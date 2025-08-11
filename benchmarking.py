@@ -31,14 +31,14 @@ def main():
         # Datasets to benchmark on
         datasets=[
             dataset_1,
-            dataset_2,
+            # dataset_2,
         ],
         config=BenchmarkConfig(
             # Fingerprint methods to benchmark
             methods=[
                 # BASIC_FINGERPRINT,
                 # XOR_FINGERPRINT,
-                SINGLE_SHA_FINGERPRINT,
+                # SINGLE_SHA_FINGERPRINT,
                 DATASKETCH_FINGERPRINT,
             ],
             # Configs to benchmark with. Keys are the name of the config as it
