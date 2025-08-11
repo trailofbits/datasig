@@ -26,6 +26,7 @@ class DatasetType(Enum):
     CSV = "CSV file"
     ARFF = "ARFF file"
     RAW = "List of raw bytes data points"
+    SQL = "SQL database"
 
 
 class Dataset(ABC):
@@ -302,6 +303,111 @@ class RawDataset(Dataset):
     @staticmethod
     def deserialize_data_point(data: bytes) -> bytes:
         return data
+
+
+
+class SQLDriver(StrEnum):
+    MYSQL = "mysql"
+    SQLITE3 = "sqlite3"
+
+
+class SQLDataset(Dataset):
+    """Dataset from an SQL database"""
+
+    def __init__(self, name: str, db_path: str, query: str, driver_module: SQLDriver, connect_params: list[any] = []):
+        super().__init__(DatasetType.SQL)
+        self._name = name
+        self.db_path = db_path
+        self.query = query
+        # Set driver
+        if driver_module == SQLDriver.MYSQL:
+            import pymysql
+            self.driver_module = pymysql
+        elif driver_module == SQLDriver.SQLITE3:
+            import sqlite3
+            self.driver_module = sqlite3
+        # Connect
+        self.conn = self.driver_module.connect(self.db_path, **connect_params)
+        self.cursor = conn.cursor()
+        self.cursor.execute(self.query)
+        # Get column information using DB-API 2.0 standard cursor.description
+        # cursor.description returns: (name, type_code, display_size, internal_size, 
+        # precision, scale, null_ok) for each column
+        self.data_format = self.cursor.description
+        if self.data_format is None:
+            raise Exception("No data from SQL query")
+        # Compute permutation needed to sort column names in alphabetical order
+        self.sorted_columns_permutation = np.argsort([x[0] for x in self.data_format])
+
+    def __len__(self) -> int:
+        """Return the number of data points in the dataset"""
+        return self.cursor.rowcount
+
+    @property
+    def name(self) -> str:
+        """Name identifying the dataset"""
+        return self._name
+
+    @property
+    def data_points(self) -> Generator[tuple, None, None]:
+        """Iterate through all data points (transformed as bytes)"""
+        class CursorIterator:
+            def __init__(self, cursor):
+                self.cursor = cursor
+            
+            def __iter__(self):
+                return self
+
+            def __next__(self):
+                data = self.cursor.fetchone()
+                if data is None:
+                    raise StopIteration
+                yield data
+
+        return CursorIterator(self.cursor)
+
+    def encode_data_point(self, data_point: tuple) -> bytes:
+        res = b''
+        # Just encode all fields following the alphabetical order
+        # of the data columns
+        for colIdx in self.sorted_columns_permutation:
+            data = data_point[colIdx]
+            res += self._encode_data_field(data)
+        return res
+
+    @staticmethod
+    def _encode_data_field(value: any) -> bytes:
+        # NOTE, we could also check the data type
+        # instead of relying on python types here, but
+        # they are specific to each driver so that would
+        # require an additional level of parsing of
+        # data_type = self.data_format[colIdx][1] # `type_code`
+        if isinstance(value, str):
+            return value.encode('utf-8')
+        elif isinstance(value, bytes):
+            return value
+        elif isinstance(value, int):
+            # Sufficient to handle 64b integers
+            return struct.pack(data, "<q")
+        elif isinstance(value, float):
+            # Sufficient to handle 64b doubles
+            return struct.pack(value, "<d")
+        else:
+            raise Exception("Data type not yet supported")
+
+
+    @staticmethod
+    def serialize_data_point(data: tuple) -> bytes:
+        # NOTE: right now we can afford using pickle
+        # because technically the data can't be tampered
+        # with if we send it directly to the runner. 
+        # TODO: we should still move away from this and
+        # use a ser/deser protocol like protobuf
+        return pickle.dumps(data)
+
+    @staticmethod
+    def deserialize_data_point(data: bytes) -> bytes:
+        return pickle.loads(data)
 
 
 class CanonicalDataset:
