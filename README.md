@@ -4,7 +4,7 @@ This repository contains our proof-of-concept for fingerprinting a dataset.
 ## Local installation
 ```python
 git clone https://github.com/trailofbits/datasig && cd datasig
-python3 -m pip install .
+uv sync
 ```
 
 ## Usage
@@ -74,9 +74,9 @@ data_point = TorchVisionDataset.deserialize_data_point(data)
 Tests are in the `datasig/test` directory. You can run the tests with:
 
 ```bash
-python3 -m pytest # Run all tests
-python3 -m pytest -s datasig/test/test_csv.py # Run only one test file
-python3 -m pytest -s datasig/test/test_csv.py -k test_similarity # Run only one specific test function
+uv run python -m pytest # Run all tests
+uv run python -m pytest -s datasig/test/test_csv.py # Run only one test file
+uv run python -m pytest -s datasig/test/test_csv.py -k test_similarity # Run only one specific test function
 ```
 
 ### Profiling
@@ -84,19 +84,19 @@ The profiling script generates a profile for dataset processing and fingerprint 
 you can run:
 
 ```bash
-python3 profiling.py torch_mnist --full
+uv run python profiling.py torch_mnist --full
 ```
 
 The `--full` argument tells the script to include dataset canonization, UID generation, and fingerprint generation in the profile. If you want to profile only some of these steps you can cherry pick by using or omitting the following arguments instead:
 
 ```bash
-python3 profiling.py torch_mnist --canonical --uid --fingerprint
+uv run python profiling.py torch_mnist --canonical --uid --fingerprint
 ```
 
 You can optionally specify the datasig config version to use (at the time of writing we have only v0) with:  
 
 ```bash
-python3 profiling.py torch_mnist -v 0 --all
+uv run python profiling.py torch_mnist -v 0 --all
 ```
 
 Currently we support only one target dataset: `torch_mnist`. To add another dataset, add a class in `profiling.py` similar to `TorchMNISTV0`, that implements the `_setup()` method which is responsible for loading the dataset.
@@ -110,5 +110,5 @@ The `benchmarking.py` script gives a comprehensive overview of how to configure 
 You can run the example benchmark with
 
 ```bash
-python3 benchmarking.py
+uv run python benchmarking.py
 ```
