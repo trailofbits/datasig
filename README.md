@@ -14,60 +14,37 @@ This will be subject to frequent changes in early development stages.
 
 ```python
 from torchvision.datasets import MNIST
-from datasig.dataset import TorchVisionDataset, CanonicalDataset
+from datasig.dataset import TorchVisionDataset
+from datasig.algo import KeyedShaMinHash, UID
 
 torch_dataset = MNIST(root="/tmp/data", train=True, download=True)
+
+# Wrap the dataset with one of the classes in `datasig.dataset`.
+# These classes provide a uniform interface to access serialized data points.
 dataset = TorchVisionDataset(torch_dataset)
-canonical = CanonicalDataset(dataset)
-print("Dataset UID: ", canonical.uid)
-print("Dataset fingerprint: ", canonical.fingerprint)
+
+# Pass the dataset to the fingerprinting algorithm.
+print("Dataset UID: ", UID(dataset).digest())
+print("Dataset fingerprint: ", KeyedShaMinHash(dataset).digest())
 ```
 
-### Dynamic dataset streaming
-Datasig can be used in AIBOM solutions that require data to be streamed
-dynamically. Here is how to use it, using the MNIST example
-
-On the server side (acquire and serve data):
+### Manual serialization/deserialization
+The dataset classes defined in `datasig.dataset` provide static serialization
+and deserialization to convert datapoints between their usual representation
+and bytes.
 
 ```python
 from torchvision.datasets import MNIST
-from datasig.dataset import TorchVisionDataset, CanonicalDataset
-from datasig.streaming import StreamedDataset
-
-# Create dataset and wrap with StreamedDataset
-torch_dataset = MNIST(root="/tmp/data", train=True, download=True)
-stream = StreamedDataset(TorchVisionDataset(torch_dataset))
-
-# Option 1: Iterative data point access
-for data_point in stream:
-    pass
-
-# Option 2: Index-based data point access
-data_point = stream[10]
-
-# Serializing data points to bytes and serve
-x = stream.serialize_data_point(data_point)
-your_send_data_function(x)
-
-# Once done streaming, compute fingerprint
-canonical = CanonicalDataset(stream)
-print("Dataset fingerprint: ", canonical.fingerprint)
-```
-
-On the client side (receive, deserialize, and use the data):
-
-```python
 from datasig.dataset import TorchVisionDataset
 
-# Get data sent by the server side
-data: bytes = your_receive_data_function()
+torch_dataset = MNIST(root="/tmp/data", train=True, download=True)
 
-# Deserialize data to get proper python object
-data_point = TorchVisionDataset.deserialize_data_point(data)
+# Serializing data points to bytes
+serialized = TorchVisionDataset.serialize_data_point(torch_dataset[0])
 
-# Do something with the data...
+# Deserializing data points from bytes
+deserialized = TorchVisionDataset.deserialize_data_point(serialized)
 ```
-
 
 ## Development
 ### Unit tests
@@ -102,6 +79,9 @@ uv run python profiling.py torch_mnist -v 0 --all
 Currently we support only one target dataset: `torch_mnist`. To add another dataset, add a class in `profiling.py` similar to `TorchMNISTV0`, that implements the `_setup()` method which is responsible for loading the dataset.
 
 ### Benchmarking
+
+!!! This is currently broken !!!
+
 Datasig has a built-in `benchmark` module that allows to run experiments to benchmark speed and accuracy of various fingerprinting methods with varying configurations and on several datasets.
 
 Benchmarks are configured programmatically using the `datasig` library directly.
