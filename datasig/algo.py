@@ -10,15 +10,24 @@ from .fingerprint import (
     BasicDatasetFingerprint,
     DatasketchFingerprint,
 )
+from typing import Self
 
 
 class Algorithm(ABC):
     @abstractmethod
-    def update(self, data: bytes | list[bytes]) -> None:
+    def update(self, data: bytes | Iterable[bytes]) -> None:
         pass
 
     @abstractmethod
     def digest(self) -> DatasetFingerprint | DatasetUID:
+        pass
+
+    @abstractmethod
+    def __str__(self) -> str:
+        pass
+
+    @abstractmethod
+    def clone_config(self) -> Self:
         pass
 
 
@@ -34,12 +43,12 @@ class MinHash(Algorithm, ABC):
     def _sort(self):
         self._hashes.sort()
 
-    def update(self, data: bytes | list[bytes]) -> None:
+    def update(self, data: bytes | Iterable[bytes]) -> None:
         self._synced = False
-        if isinstance(data, list):
-            self._hashes += [hashlib.sha256(x).digest() for x in data]
-        else:
+        if isinstance(data, bytes):
             self._hashes.append(hashlib.sha256(data).digest())
+        else:
+            self._hashes += [hashlib.sha256(x).digest() for x in data if isinstance(x, bytes)]
 
     @abstractmethod
     def _get_fingerprint(self) -> DatasetFingerprint:
@@ -65,9 +74,15 @@ class KeyedShaMinHash(MinHash):
 
     lsh_magic_numbers: list[bytes] = [struct.pack(">I", i) for i in list(range(1, 401))]
 
-    def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
+    def __init__(self, data: Iterable[bytes] = [], nb_signatures: int = 400):
         super().__init__(data)
         self.nb_signatures = nb_signatures
+
+    def __str__(self) -> str:
+        return f"KeyedShaMinHash(nb_signatures={self.nb_signatures})"
+
+    def clone_config(self) -> Self:
+        return self.__class__(nb_signatures=self.nb_signatures)
 
     def _get_fingerprint(self) -> DatasetFingerprint:
         if len(self._hashes) < self.nb_signatures:
@@ -102,9 +117,15 @@ class XorMinHash(MinHash):
 
     xor_magic_numbers: list[bytes] = gen_xor_magic_numbers()
 
-    def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
+    def __init__(self, data: Iterable[bytes] = [], nb_signatures: int = 400):
         super().__init__(data)
         self.nb_signatures = nb_signatures
+
+    def __str__(self) -> str:
+        return f"XorMinHash(nb_signatures={self.nb_signatures})"
+
+    def clone_config(self) -> Self:
+        return self.__class__(nb_signatures=self.nb_signatures)
 
     def _get_fingerprint(self) -> DatasetFingerprint:
         if len(self._hashes) < self.nb_signatures:
@@ -131,9 +152,15 @@ class SingleShaMinHash(MinHash):
     And https://en.wikipedia.org/wiki/MinHash#Variant_with_a_single_hash_function.
     """
 
-    def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
+    def __init__(self, data: Iterable[bytes] = [], nb_signatures: int = 400):
         super().__init__(data)
         self.nb_signatures = nb_signatures
+
+    def __str__(self) -> str:
+        return f"SingleShaMinHash(nb_signatures={self.nb_signatures})"
+
+    def clone_config(self) -> Self:
+        return self.__class__(nb_signatures=self.nb_signatures)
 
     def _get_fingerprint(self) -> DatasetFingerprint:
         # Relies on the fact that the data point hashes are sorted
@@ -158,9 +185,15 @@ class DatasketchMinHash(MinHash):
     number of permutations.
     """
 
-    def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
+    def __init__(self, data: Iterable[bytes] = [], nb_signatures: int = 400):
         super().__init__(data)
         self.nb_signatures = nb_signatures
+
+    def __str__(self) -> str:
+        return f"DatasketchMinHash(nb_signatures={self.nb_signatures})"
+
+    def clone_config(self) -> Self:
+        return self.__class__(nb_signatures=self.nb_signatures)
 
     def _get_fingerprint(self) -> DatasetFingerprint:
         res = datasketch.MinHash(num_perm=self.nb_signatures)
@@ -173,17 +206,24 @@ class DatasketchMinHash(MinHash):
 class UID(Algorithm):
     """Generate dataset unique identifier"""
 
-    def __init__(self, data: Iterable[bytes]) -> None:
+    def __init__(self, data: Iterable[bytes] = []) -> None:
         self._uid = hashlib.sha256()
         for h in data:
             self._uid.update(h)
 
-    def update(self, data: bytes | list[bytes]) -> None:
-        if isinstance(data, list):
-            for h in data:
-                self._uid.update(h)
-        else:
+    def __str__(self) -> str:
+        return f"UID"
+
+    def clone_config(self) -> Self:
+        return self.__class__()
+
+    def update(self, data: bytes | Iterable[bytes]) -> None:
+        if isinstance(data, bytes):
             self._uid.update(data)
+        else:
+            for h in data:
+                assert isinstance(h, bytes)
+                self._uid.update(h)
 
     def digest(self) -> DatasetUID:
         # Hash the concatenation of the data points
