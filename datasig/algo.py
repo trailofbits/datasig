@@ -3,8 +3,13 @@ from abc import ABC, abstractmethod
 import hashlib
 import struct
 import numpy as np
-import datasketch # pyright: ignore[reportMissingTypeStubs]
-from .fingerprint import DatasetFingerprint, DatasetUID, BasicDatasetFingerprint, DatasketchFingerprint
+import datasketch  # pyright: ignore[reportMissingTypeStubs]
+from .fingerprint import (
+    DatasetFingerprint,
+    DatasetUID,
+    BasicDatasetFingerprint,
+    DatasketchFingerprint,
+)
 
 
 class Algorithm(ABC):
@@ -25,17 +30,17 @@ class MinHash(Algorithm, ABC):
 
         for d in data:
             self.update(d)
-    
+
     def _sort(self):
         self._hashes.sort()
-        
+
     def update(self, data: bytes | list[bytes]) -> None:
         self._synced = False
         if isinstance(data, list):
             self._hashes += [hashlib.sha256(x).digest() for x in data]
         else:
             self._hashes.append(hashlib.sha256(data).digest())
-    
+
     @abstractmethod
     def _get_fingerprint(self) -> DatasetFingerprint:
         pass
@@ -45,9 +50,8 @@ class MinHash(Algorithm, ABC):
             if not self._synced:
                 self._hashes.sort()
             self._fingerprint = self._get_fingerprint()
-        
-        return self._fingerprint
 
+        return self._fingerprint
 
 
 class KeyedShaMinHash(MinHash):
@@ -58,6 +62,7 @@ class KeyedShaMinHash(MinHash):
 
     See https://web.eecs.utk.edu/~jplank/plank/classes/cs494/494/notes/Min-Hash/index.html, Min Hash with k hash functions.
     """
+
     lsh_magic_numbers: list[bytes] = [struct.pack(">I", i) for i in list(range(1, 401))]
 
     def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
@@ -66,16 +71,18 @@ class KeyedShaMinHash(MinHash):
 
     def _get_fingerprint(self) -> DatasetFingerprint:
         if len(self._hashes) < self.nb_signatures:
-            raise ValueError(f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points.")
+            raise ValueError(
+                f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points."
+            )
 
         res: list[bytes | None] = [None] * 400
         for i in range(self.nb_signatures):
             for h in self._hashes:
                 h2 = hashlib.sha256(h + KeyedShaMinHash.lsh_magic_numbers[i]).digest()
-                if res[i] is None or res[i] > h2: # pyright: ignore[reportOptionalOperand]
+                if res[i] is None or res[i] > h2:  # pyright: ignore[reportOptionalOperand]
                     res[i] = h2
-        
-        return BasicDatasetFingerprint(res) # pyright: ignore[reportArgumentType]
+
+        return BasicDatasetFingerprint(res)  # pyright: ignore[reportArgumentType]
 
 
 def gen_xor_magic_numbers() -> list[bytes]:
@@ -92,6 +99,7 @@ class XorMinHash(MinHash):
     The figerprint is computed using the MinHash scheme.
     Random permutations are approximated by the output of SHA256 XORed with random 256 bits values.
     """
+
     xor_magic_numbers: list[bytes] = gen_xor_magic_numbers()
 
     def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
@@ -100,16 +108,18 @@ class XorMinHash(MinHash):
 
     def _get_fingerprint(self) -> DatasetFingerprint:
         if len(self._hashes) < self.nb_signatures:
-            raise ValueError(f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points.")
-        
+            raise ValueError(
+                f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points."
+            )
+
         res: list[bytes | None] = [None] * self.nb_signatures
         for i in range(self.nb_signatures):
             for h in self._hashes:
                 h2 = bytes([a ^ b for a, b in zip(h, XorMinHash.xor_magic_numbers[i])])
-                if res[i] is None or res[i] > h2: # pyright: ignore[reportOptionalOperand]
+                if res[i] is None or res[i] > h2:  # pyright: ignore[reportOptionalOperand]
                     res[i] = h2
-        
-        return BasicDatasetFingerprint(res) # pyright: ignore[reportArgumentType]
+
+        return BasicDatasetFingerprint(res)  # pyright: ignore[reportArgumentType]
 
 
 class SingleShaMinHash(MinHash):
@@ -120,6 +130,7 @@ class SingleShaMinHash(MinHash):
     See https://web.eecs.utk.edu/~jplank/plank/classes/cs494/494/notes/Min-Hash/index.html, Min Hash with one hash functions.
     And https://en.wikipedia.org/wiki/MinHash#Variant_with_a_single_hash_function.
     """
+
     def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
         super().__init__(data)
         self.nb_signatures = nb_signatures
@@ -127,11 +138,13 @@ class SingleShaMinHash(MinHash):
     def _get_fingerprint(self) -> DatasetFingerprint:
         # Relies on the fact that the data point hashes are sorted
         if len(self._hashes) < self.nb_signatures:
-            raise ValueError(f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points.")
-        
-        res = self._hashes[:self.nb_signatures]
-        
-        return BasicDatasetFingerprint(res) # pyright: ignore[reportArgumentType]
+            raise ValueError(
+                f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points."
+            )
+
+        res = self._hashes[: self.nb_signatures]
+
+        return BasicDatasetFingerprint(res)  # pyright: ignore[reportArgumentType]
 
 
 class DatasketchMinHash(MinHash):
@@ -144,6 +157,7 @@ class DatasketchMinHash(MinHash):
     We can customize this further using different hash functions and
     number of permutations.
     """
+
     def __init__(self, data: Iterable[bytes], nb_signatures: int = 400):
         super().__init__(data)
         self.nb_signatures = nb_signatures
@@ -151,18 +165,19 @@ class DatasketchMinHash(MinHash):
     def _get_fingerprint(self) -> DatasetFingerprint:
         res = datasketch.MinHash(num_perm=self.nb_signatures)
         for d in self._hashes:
-            res.update(d) # pyright: ignore[reportUnknownMemberType]
-        
-        return DatasketchFingerprint(res) # pyright: ignore[reportArgumentType]
+            res.update(d)  # pyright: ignore[reportUnknownMemberType]
+
+        return DatasketchFingerprint(res)  # pyright: ignore[reportArgumentType]
 
 
 class UID(Algorithm):
     """Generate dataset unique identifier"""
+
     def __init__(self, data: Iterable[bytes]) -> None:
         self._uid = hashlib.sha256()
         for h in data:
             self._uid.update(h)
-    
+
     def update(self, data: bytes | list[bytes]) -> None:
         if isinstance(data, list):
             for h in data:
@@ -173,4 +188,3 @@ class UID(Algorithm):
     def digest(self) -> DatasetUID:
         # Hash the concatenation of the data points
         return DatasetUID(self._uid.digest())
-

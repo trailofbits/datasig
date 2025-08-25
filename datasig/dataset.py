@@ -71,12 +71,14 @@ class TorchVisionDataset(SequenceDataset):
 
     def __getitem__(self, idx: int) -> bytes:
         return TorchVisionDataset.serialize_data_point(self.dataset[idx])
-    
+
     def __len__(self) -> int:
         return len(self.dataset)
-    
+
     def __iter__(self) -> Iterator[bytes]:
-        return (TorchVisionDataset.serialize_data_point(data_point) for data_point in iter(self.dataset))
+        return (
+            TorchVisionDataset.serialize_data_point(data_point) for data_point in iter(self.dataset)
+        )
 
     @property
     def name(self) -> str:
@@ -99,18 +101,18 @@ class TorchVisionDataset(SequenceDataset):
             len(mode_bytes),
             len(image_bytes),
             mode_bytes,
-            image_bytes
+            image_bytes,
         )
 
     @staticmethod
     def deserialize_data_point(data: bytes) -> tuple[Image.Image, int]:
         label, width, height, mode_len, image_len = struct.unpack_from("IIIII", data, offset=0)
         mode_bytes: bytes = struct.unpack_from(f"{mode_len}s", data, offset=20)[0]
-        image_bytes: bytes = struct.unpack_from(f"{image_len}s", data, offset=20+mode_len)[0]
-        
+        image_bytes: bytes = struct.unpack_from(f"{image_len}s", data, offset=20 + mode_len)[0]
+
         mode = mode_bytes.decode()
         size: tuple[int, int] = (width, height)
-        
+
         return Image.frombytes(mode, size, image_bytes, decoder_name="raw"), label
 
 
@@ -153,7 +155,10 @@ class CSVDataset(SequenceDataset):
     """Dataset contained in a CSV file"""
 
     def __init__(
-        self, csv_data: Iterable[str] | list[str] | Path | str, dialect: str = "excel", **fmtparams: Any
+        self,
+        csv_data: Iterable[str] | list[str] | Path | str,
+        dialect: str = "excel",
+        **fmtparams: Any,
     ):
         self.csv_data = csv_data
         self.dialect = dialect
@@ -167,7 +172,7 @@ class CSVDataset(SequenceDataset):
 
         self.csv_reader = self._get_reader()
         self.cached_rows: list[list[str]] = []
-    
+
     def _get_reader(self) -> Iterator[list[str]]:
         if isinstance(self.csv_data, (Path, str)):
             # Read from static file
@@ -198,7 +203,7 @@ class CSVDataset(SequenceDataset):
     def deserialize_data_point(data: bytes) -> list[str]:
         reader = csv.reader(io.StringIO(data.decode()))
         return next(reader)
-    
+
     def __len__(self) -> int:
         """Return the number of data points in the dataset"""
         return sum(1 for _ in self.__iter__())
@@ -213,9 +218,8 @@ class CSVDataset(SequenceDataset):
         remaining_steps = idx + 1 - len(self.cached_rows)
         for _ in range(0, remaining_steps):
             self.cached_rows.append(next(self.csv_reader))
-        
-        return CSVDataset.serialize_data_point(self.cached_rows[idx])
 
+        return CSVDataset.serialize_data_point(self.cached_rows[idx])
 
     def __iter__(self) -> Iterator[bytes]:
         """Iterate through all data points (transformed as bytes)"""

@@ -1,4 +1,4 @@
-from torchvision.datasets import MNIST # pyright: ignore
+from torchvision.datasets import MNIST  # pyright: ignore
 from datasig.algo import UID, KeyedShaMinHash
 from datasig.dataset import TorchVisionDataset, IterableDataset
 import cProfile
@@ -19,24 +19,26 @@ class FingerprintProfile(ABC):
         """Method that needs to be overridden by child classes to set self.dataset"""
         pass
 
-    def _run_profile(self, uid: bool = True, fingerprint: bool = True, profile_canonization: bool = True):
+    def _run_profile(
+        self, uid: bool = True, fingerprint: bool = True, profile_canonization: bool = True
+    ):
         if profile_canonization:
             self.profile.enable()
 
         if uid:
             uid_alg = UID(self.dataset)
-        
+
         if fingerprint:
             fingerprint_alg = KeyedShaMinHash(self.dataset)
-        
+
         if not profile_canonization:
             self.profile.enable()
-        
+
         if uid:
-            _ = uid_alg.digest() # pyright: ignore
+            _ = uid_alg.digest()  # pyright: ignore
         if fingerprint:
-            _ = fingerprint_alg.digest() # pyright: ignore
-        
+            _ = fingerprint_alg.digest()  # pyright: ignore
+
         self.profile.disable()
 
     def __call__(
@@ -46,14 +48,18 @@ class FingerprintProfile(ABC):
         profile_fingerprint: bool = True,
     ) -> cProfile.Profile:
         self._setup()
-        self._run_profile(uid=profile_uid, fingerprint=profile_fingerprint, profile_canonization=profile_canonization)
+        self._run_profile(
+            uid=profile_uid,
+            fingerprint=profile_fingerprint,
+            profile_canonization=profile_canonization,
+        )
         return self.profile
 
 
 class TorchMNISTV0(FingerprintProfile):
     def _setup(self):
         train_data = MNIST(root="/tmp/mnist_data", train=True, download=True)
-        self.dataset = TorchVisionDataset(train_data) # pyright: ignore
+        self.dataset = TorchVisionDataset(train_data)  # pyright: ignore
 
 
 def print_profile(profile: cProfile.Profile):

@@ -1,13 +1,13 @@
 import math
 from abc import ABC, abstractmethod
-import datasketch # pyright: ignore[reportMissingTypeStubs]
+import datasketch  # pyright: ignore[reportMissingTypeStubs]
 
 
 class DatasetUID(bytes):
-    def __new__(cls, data: bytes = b''):
+    def __new__(cls, data: bytes = b""):
         if len(data) != 32:
             raise ValueError("Dataset UID must be a valid SHA256 hash. Length is invalid.")
-        
+
         return super().__new__(cls, data)
 
 
@@ -50,13 +50,15 @@ class BasicDatasetFingerprint(DatasetFingerprint):
         assert len(self) == len(other)
         assert isinstance(other, BasicDatasetFingerprint)
         # Count how many signature pairs are made of identical signatures
-        return sum(map(lambda x: x[0] == x[1], zip(self._signatures, other._signatures))) / len(self)
+        return sum(map(lambda x: x[0] == x[1], zip(self._signatures, other._signatures))) / len(
+            self
+        )
 
     def comparison_accuracy(self) -> float:
         if self._signatures:
             return 1.0 - (1.0 / math.sqrt(len(self._signatures)))
         return 0.0
-    
+
     def signature(self) -> bytes:
         return b"".join(self._signatures)
 
