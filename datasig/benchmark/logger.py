@@ -1,5 +1,13 @@
 import logging
 import sys
+from logging import LogRecord
+
+
+def colored_fmt(color: str, whole: bool = False) -> str:
+    reset = "\x1b[0m"
+    if whole:
+        return f"{color}%(asctime)s - %(levelname)s - %(message)s{reset}"
+    return f"%(asctime)s - {color}%(levelname)s{reset} - %(message)s"
 
 
 # From https://stackoverflow.com/a/56944256
@@ -12,12 +20,6 @@ class ColoredFormatter(logging.Formatter):
     blue = "\x1b[34m"
     green = "\x1b[32m"
 
-    def colored_fmt(color: str, whole=False) -> str:
-        reset = "\x1b[0m"
-        if whole:
-            return f"{color}%(asctime)s - %(levelname)s - %(message)s{reset}"
-        return f"%(asctime)s - {color}%(levelname)s{reset} - %(message)s"
-
     FORMATS = {
         logging.DEBUG: colored_fmt(blue),
         logging.INFO: colored_fmt(green),
@@ -26,7 +28,7 @@ class ColoredFormatter(logging.Formatter):
         logging.CRITICAL: colored_fmt(bold_red, whole=True),
     }
 
-    def format(self, record):
+    def format(self, record: LogRecord):
         log_fmt = self.FORMATS.get(record.levelno)
         formatter = logging.Formatter(log_fmt)
         return formatter.format(record)

@@ -1,10 +1,10 @@
-from ..dataset import CanonicalDataset
+from datasig.algo import KeyedShaMinHash
+from datasig.dataset import IterableDataset
 import requests
-import shutil
-import arff
+import arff # pyright: ignore[reportMissingTypeStubs]
 
 
-def download_file(url, outfile=None) -> str:
+def download_file(url: str, outfile: str | None = None) -> str:
     if not outfile:
         outfile = url.split("/")[-1]
     with requests.get(url) as r:
@@ -14,12 +14,12 @@ def download_file(url, outfile=None) -> str:
 
 
 def assert_fingerprint_similarity(
-    dataset_a: CanonicalDataset, dataset_b: CanonicalDataset, expected_similarity: float
+    dataset_a: IterableDataset, dataset_b: IterableDataset, expected_similarity: float
 ):
     """Check dataset similarity using their fingerprints against an expected
     similarity value"""
-    fingerprint_a = dataset_a.fingerprint
-    fingerprint_b = dataset_b.fingerprint
+    fingerprint_a = KeyedShaMinHash(dataset_a).digest()
+    fingerprint_b = KeyedShaMinHash(dataset_b).digest()
     assert len(fingerprint_a) == len(fingerprint_b)
 
     similarity = fingerprint_a.similarity(fingerprint_b)
@@ -42,11 +42,11 @@ def extract_csv_range(csv_file: "str", start: int, end: int, outfile: str) -> st
     return outfile
 
 
-def extract_arff_range(arff_file: "str", start: int, end: int, outfile: str) -> str:
+def extract_arff_range(arff_file: str, start: int, end: int, outfile: str) -> str:
     """Extracts a range of data points from an ARFF file into another ARFF file"""
     with open(arff_file, "r") as f:
         with open(outfile, "w") as outf:
-            data = arff.load(f)
+            data = arff.load(f) # pyright: ignore[reportUnknownMemberType, reportUnknownVariableType]
             data["data"] = data["data"][start:end]
-            outf.write(arff.dumps(data))
+            outf.write(arff.dumps(data)) # pyright: ignore[reportUnknownMemberType]
     return outfile

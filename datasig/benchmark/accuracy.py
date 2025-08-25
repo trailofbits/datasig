@@ -1,18 +1,18 @@
-from torchvision.datasets import MNIST
 from datasig.dataset import (
-    CanonicalDataset,
-    Dataset,
     TorchVisionDataset,
     ARFFDataset,
-    DatasetType,
 )
-from datasig.config import *
+from datasig.algo import Algorithm
+from datasig.fingerprint import DatasetFingerprint
 import numpy as np
 import torch
-from typing import Any, Optional
-from .utils import FingerprintMethod, extract_arff_indices
+from typing import Optional
+from .utils import extract_arff_indices
 import tempfile
-from ..logger import logger
+from .logger import logger
+from PIL.Image import Image
+from collections.abc import Sized
+from dataclasses import dataclass
 
 
 @dataclass
@@ -32,8 +32,14 @@ class SubsetCache:
 
     def clean(self):
         """Clean the cache"""
-        self.subsets = dict()
-        self.subset_indices = dict()
+        self.subsets: dict[
+            str,
+            list[
+                tuple[TorchVisionDataset, TorchVisionDataset, float]
+                | tuple[ARFFDataset, ARFFDataset, float]
+            ],
+        ] = dict()
+        self.subset_indices: dict[str, int] = dict()
 
     def reset(self):
         """Reset the indices to iterate over the cached subsets.
@@ -41,7 +47,12 @@ class SubsetCache:
         for dataset_name in self.subset_indices.keys():
             self.subset_indices[dataset_name] = 0
 
-    def get_subset_pair(self, dataset: Dataset) -> tuple:
+    def get_subset_pair(
+        self, dataset: TorchVisionDataset | ARFFDataset
+    ) -> (
+        tuple[TorchVisionDataset, TorchVisionDataset, float]
+        | tuple[ARFFDataset, ARFFDataset, float]
+    ):
         """Return a tuple (subset_a, subset_b, true_jaccard).
         The subsets are CanonicalDataset objects"""
         idx = self.subset_indices.get(dataset.name, None)
@@ -55,12 +66,10 @@ class SubsetCache:
             # Need to generate new subsets pair
             # TODO(boyan): support remaining dataset formats
             logger.debug("Generating new subset pair for dataset %s", dataset.name)
-            if dataset.type == DatasetType.TORCH:
+            if isinstance(dataset, TorchVisionDataset):
                 subsets = self._get_random_torch_subsets(dataset)
-            elif dataset.type == DatasetType.ARFF:
-                subsets = self._get_random_arff_subsets(dataset)
             else:
-                raise NotImplemented(f"Unsupported dataset type: {dataset.type}")
+                subsets = self._get_random_arff_subsets(dataset)
             self.subsets[dataset.name].append(subsets)
         else:
             logger.debug(
@@ -71,7 +80,7 @@ class SubsetCache:
         # Return the subset pair
         return self.subsets[dataset.name][idx]
 
-    def _get_random_data_indices(self, dataset: Dataset):
+    def _get_random_data_indices(self, dataset: Sized) -> set[int]:
         """Extract a random subset of indices from the dataset"""
         subset_size = np.random.randint(
             min(len(dataset), self.config.min_subset_size),
@@ -79,18 +88,26 @@ class SubsetCache:
         )
         indices: np.ndarray = np.arange(len(dataset))
         np.random.shuffle(indices)
-        return indices[:subset_size]
+        return set(indices[:subset_size])
 
     def _get_random_torch_subset(
         self, dataset: TorchVisionDataset
-    ) -> tuple[set[int], torch.utils.data.Subset]:
+    ) -> tuple[set[int], torch.utils.data.Subset[tuple[Image, int]]]:
         """Extract a random subset from a torch dataset"""
         indices = self._get_random_data_indices(dataset)
-        return set(indices), torch.utils.data.Subset(dataset.dataset, indices)
+        if isinstance(dataset.dataset, torch.utils.data.Dataset):
+            subset: torch.utils.data.Subset[tuple[Image, int]] = torch.utils.data.Subset(
+                dataset.dataset, list(indices)
+            )  # pyright: ignore[reportUnknownVariableType]
+        else:
+            raise NotImplementedError(
+                "Unsupported inner underlying dataset for class `TorchvisionDataset` in `SubsetCache`"
+            )
+        return indices, subset
 
     def _get_random_torch_subsets(
         self, dataset: TorchVisionDataset
-    ) -> tuple[CanonicalDataset, CanonicalDataset, float]:
+    ) -> tuple[TorchVisionDataset, TorchVisionDataset, float]:
         """Extract two random subsets from a torch dataset and compute their true
         Jaccard similarity"""
         indices_a, subset_a = self._get_random_torch_subset(dataset)
@@ -98,14 +115,14 @@ class SubsetCache:
 
         jaccard = len(indices_a.intersection(indices_b)) / len(indices_a.union(indices_b))
 
-        c_subset_a = CanonicalDataset(TorchVisionDataset(subset_a), config=None)
-        c_subset_b = CanonicalDataset(TorchVisionDataset(subset_b), config=None)
+        c_subset_a = TorchVisionDataset(subset_a)  # pyright: ignore[reportArgumentType]
+        c_subset_b = TorchVisionDataset(subset_b)  # pyright: ignore[reportArgumentType]
 
         return c_subset_a, c_subset_b, jaccard
 
     def _get_random_arff_subsets(
         self, dataset: ARFFDataset
-    ) -> tuple[CanonicalDataset, CanonicalDataset, float]:
+    ) -> tuple[ARFFDataset, ARFFDataset, float]:
         """Extract two random subsets from a csv dataset and compute their true
         Jaccard similarity"""
         indices_a = set(self._get_random_data_indices(dataset))
@@ -118,8 +135,8 @@ class SubsetCache:
         extract_arff_indices(dataset.arff_file, indices_b, file_b)
         logger.debug("Extracted new ARFF subset in %s", file_a)
         logger.debug("Extracted new ARFF subset in %s", file_b)
-        subset_a = CanonicalDataset(ARFFDataset(file_a), config=None)
-        subset_b = CanonicalDataset(ARFFDataset(file_b), config=None)
+        subset_a = ARFFDataset(file_a)
+        subset_b = ARFFDataset(file_b)
 
         return subset_a, subset_b, jaccard
 
@@ -138,17 +155,17 @@ class FingerprintAccuracyRandomTester:
 
     def __init__(
         self,
-        dataset: Dataset,
-        fingerprint_method: FingerprintMethod,
-        fingerprint_config: Any,
+        dataset: TorchVisionDataset | ARFFDataset,
+        algo: Algorithm,
         config: AccuracyConfig,
         subset_cache: Optional[SubsetCache] = None,
     ) -> None:
         self.dataset = dataset
-        self.fingerprint_method = fingerprint_method
-        self.fingerprint_config = fingerprint_config
+        self.algo = algo
         self.config = config
-        self.subset_cache = subset_cache if subset_cache is not None else SubsetCache()
+        self.subset_cache = (
+            subset_cache if subset_cache is not None else SubsetCache(AccuracyConfig())
+        )
 
     def run(self) -> float:
         """Measure the accuracy of the fingerprint method. This function
@@ -157,7 +174,7 @@ class FingerprintAccuracyRandomTester:
 
         It returns the average error over the number of tests. The lesser the better."""
 
-        results = []
+        results: list[float] = []
         # Make sure we reset the cache so that we start from already
         # cached subsets before generating new ones.
         self.subset_cache.reset()
@@ -175,6 +192,13 @@ class FingerprintAccuracyRandomTester:
         similarity. The bigger the return value is the less accurate the
         estimated similarity is"""
         subset_a, subset_b, jaccard = self.subset_cache.get_subset_pair(self.dataset)
-        fingerprint_a = self.fingerprint_method(subset_a, self.fingerprint_config)
-        fingerprint_b = self.fingerprint_method(subset_b, self.fingerprint_config)
+        algo_a = self.algo.clone_config()
+        algo_b = self.algo.clone_config()
+        algo_a.update(subset_a)
+        algo_b.update(subset_b)
+        fingerprint_a = algo_a.digest()
+        fingerprint_b = algo_b.digest()
+        assert isinstance(fingerprint_a, DatasetFingerprint) and isinstance(
+            fingerprint_b, DatasetFingerprint
+        )
         return abs(fingerprint_a.similarity(fingerprint_b) - jaccard)

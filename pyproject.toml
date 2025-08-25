@@ -1,6 +1,6 @@
 [project]
 name = "datasig"
-version = "0.0.2"
+version = "0.0.3"
 requires-python = ">= 3.8"
 readme = "README.md"
 description = "Dataset fingerprinting library"
@@ -21,7 +21,10 @@ dependencies = [
 
 [dependency-groups]
 dev = [
+    "black>=24.8.0",
     "liac-arff>=2.5.0",
+    "pandas>=2.0.3",
+    "plotly>=6.3.0",
     "pytest>=8.3.5",
     "requests>=2.32.4",
     "torchvision>=0.20.1",
@@ -37,3 +40,8 @@ module-root = ""
 [tool.black]
 line-length = 100
 extend-exclude = '''^/.*/test'''
+
+[tool.pyright]
+exclude = [
+    "datasig/benchmark/plot.py",
+]

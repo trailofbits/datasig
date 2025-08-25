@@ -1,14 +1,10 @@
 from datasig.benchmark import (
     Benchmark,
     BenchmarkConfig,
-    BASIC_FINGERPRINT,
-    XOR_FINGERPRINT,
-    SINGLE_SHA_FINGERPRINT,
-    DATASKETCH_FINGERPRINT,
     AccuracyConfig,
 )
-from torchvision.datasets import MNIST
-from datasig.config import ConfigV0
+from datasig.algo import SingleShaMinHash, DatasketchMinHash
+from torchvision.datasets import MNIST  # pyright: ignore[reportMissingTypeStubs]
 from datasig.dataset import TorchVisionDataset, ARFFDataset
 from datasig.test.utils import download_file
 
@@ -17,7 +13,7 @@ from datasig.test.utils import download_file
 def main():
     # Get datasets to benchmark on
     data = MNIST(root="/tmp/mnist_data", train=True, download=True)
-    dataset_1 = TorchVisionDataset(data)
+    dataset_1 = TorchVisionDataset(data)  # pyright: ignore[reportArgumentType]
 
     arff_file = download_file(
         "https://www.openml.org/data/download/2169/BayesianNetworkGenerator_trains.arff",
@@ -35,16 +31,11 @@ def main():
         ],
         config=BenchmarkConfig(
             # Fingerprint methods to benchmark
-            methods=[
-                # BASIC_FINGERPRINT,
-                # XOR_FINGERPRINT,
-                SINGLE_SHA_FINGERPRINT,
-                DATASKETCH_FINGERPRINT,
+            algos=[
+                SingleShaMinHash(nb_signatures=400),
+                DatasketchMinHash(nb_signatures=400),
             ],
-            # Configs to benchmark with. Keys are the name of the config as it
-            # will appear in the results
-            configs={"default": ConfigV0()},
-            # How to test fingerprint accuracy. Only needed if measure_accuracy is True
+            # How to test fingerprint accuracy. None to omit.
             accuracy_config=AccuracyConfig(
                 min_subset_size=1000,
                 max_subset_size=3000,
@@ -52,8 +43,6 @@ def main():
             ),
             # Whether to measure fingerprint generation time
             measure_time=True,
-            # Whether to measure fingerprint accuracy
-            measure_accuracy=True,
         ),
     )
 
