@@ -1,22 +1,20 @@
-from dataclasses import dataclass, asdict
-from ..dataset import Dataset, DatasetType, CanonicalDataset
-from typing import List, Dict, Callable, Optional, Any
-from enum import StrEnum
-from ..fingerprint import DatasetFingerprint
-from .utils import catchtime, FingerprintMethod
+from dataclasses import dataclass
+from ..dataset import IterableDataset, TorchVisionDataset, ARFFDataset
+from typing import Any
+from ..algo import Algorithm
+from .utils import catchtime
 from .accuracy import AccuracyConfig, FingerprintAccuracyRandomTester, SubsetCache
 import csv
-from typing import TextIO
 from io import StringIO
-from .plot import plot_results, plot_results2
-from ..logger import logger
+from .plot import plot_results2
+from .logger import logger
 import uuid
 
 
 @dataclass
 class DatasetInfo:
     name: str
-    format: DatasetType
+    format: str
 
 
 # TODO(boyan): properly define the config type?
@@ -27,17 +25,17 @@ Config = Any
 class BenchmarkResult:
     # Test case information
     dataset_info: DatasetInfo
-    fingerprint_method: str
-    config_name: str = ""
+    algorithm: str
+    # config_name: str = ""
     # Time measurements in seconds
-    time_canonization: Optional[float] = None
-    time_fingerprint: Optional[float] = None
+    time_canonization: float | None = None
+    time_fingerprint: float | None = None
     # Accuracy measurements
-    accuracy_error: Optional[float] = None
+    accuracy_error: float | None = None
 
     def __str__(self):
         res = ""
-        res += f"Case: {self.fingerprint_method} - {self.config_name} config - {self.dataset_info.name}\n"
+        res += f"Case: {self.algorithm} - {self.dataset_info.name}\n"
         if self.time_canonization is not None:
             res += f"  Time canonization: {self.time_canonization}\n"
         if self.time_fingerprint is not None:
@@ -49,7 +47,7 @@ class BenchmarkResult:
 
 @dataclass
 class BenchmarkResults:
-    results: List[BenchmarkResult]
+    results: list[BenchmarkResult]
 
     def add(self, result: BenchmarkResult):
         """Add a result for one benchmark case"""
@@ -67,7 +65,7 @@ class BenchmarkResults:
         writer.writerow(
             [
                 "dataset",
-                "fingerprint_method",
+                "algorithm",
                 "config_name",
                 "time_canonization",
                 "time_fingerprint",
@@ -78,8 +76,7 @@ class BenchmarkResults:
             writer.writerow(
                 [
                     result.dataset_info.name,
-                    result.fingerprint_method,
-                    result.config_name,
+                    result.algorithm,
                     result.time_canonization,
                     result.time_fingerprint,
                     result.accuracy_error,
@@ -100,18 +97,17 @@ class BenchmarkResults:
 @dataclass
 class BenchmarkConfig:
     # Configuration of the benchmark
-    methods: List[FingerprintMethod]
-    configs: Dict[str, Config]  # config_name -> config
-    accuracy_config: Optional[AccuracyConfig] = None  # used only if measure_accuracy is True
+    algos: list[Algorithm]
+    # configs: Dict[str, Config]  # config_name -> config
+    accuracy_config: AccuracyConfig | None = None
     # Which metrics to measure
     measure_time: bool = True
-    measure_accuracy: bool = False
 
 
 @dataclass
 class Benchmark:
     name: str
-    datasets: List[Dataset]
+    datasets: list[IterableDataset]
     config: BenchmarkConfig
 
     def run(self) -> BenchmarkResults:
@@ -119,67 +115,72 @@ class Benchmark:
         # This cache is used to store subsets of datasets that used in the
         # benchmark and speed up the accuracy measurements by generating them
         # only once instead of generating them for each benchmark case.
-        subsets_cache = SubsetCache(self.config.accuracy_config)
+        subsets_cache = (
+            SubsetCache(self.config.accuracy_config)
+            if self.config.accuracy_config is not None
+            else None
+        )
         # Temp file to store benchmark results as we go
         tmp_res_file = f"/tmp/{str(uuid.uuid4())[:8]}_datasig_benchmark.csv"
         # Benchmark each dataset
         for dataset in self.datasets:
-            # With each fingerprint method and supplied config(s)
-            for method in self.config.methods:
-                for config_name, config in self.config.configs.items():
-                    try:
-                        logger.info(
-                            "Running benchmark case: %s %s %s",
-                            dataset.name,
-                            method.__name__,
-                            config_name,
+            # With each algorithm and supplied config(s)
+            for algo in self.config.algos:
+                try:
+                    logger.info(
+                        "Running benchmark case: %s %s",
+                        dataset.name,
+                        str(algo),
+                    )
+                    res = BenchmarkResult(
+                        dataset_info=DatasetInfo(dataset.name, str(type(dataset))),
+                        algorithm=str(algo),
+                    )
+                    if self.config.measure_time:
+                        logger.info("Start measuring fingerprinting time")
+                        canonization_time, fingerprint_time = self._benchmark_fingerprint(
+                            dataset, algo
                         )
-                        res = BenchmarkResult(
-                            dataset_info=DatasetInfo(dataset.name, dataset.type),
-                            fingerprint_method=method.__name__,
-                            config_name=config_name,
-                        )
-                        if self.config.measure_time:
-                            logger.info("Start measuring fingerprinting time")
-                            canonization_time, fingerprint_time = self._benchmark_fingerprint(
-                                dataset, method, config
-                            )
-                            res.time_canonization = canonization_time
-                            res.time_fingerprint = fingerprint_time
-                            logger.info("Done measuring fingerprinting time")
-                        # Optionally measure fingerprint accuracy
-                        if self.config.measure_accuracy:
-                            logger.info("Start measuring fingerprint accuracy")
-                            res.accuracy_error = FingerprintAccuracyRandomTester(
-                                dataset, method, config, self.config.accuracy_config, subsets_cache
-                            ).run()
-                            logger.info("Done measuring fingerprint accuracy")
-                        results.add(res)
-                        logger.info("Dumping temporary benchmark results to file %s", tmp_res_file)
-                        results.dump_csv(tmp_res_file)
-                    except KeyboardInterrupt:
-                        logger.warning("Benchmark case interrupted")
-                        continue
+                        res.time_canonization = canonization_time
+                        res.time_fingerprint = fingerprint_time
+                        logger.info("Done measuring fingerprinting time")
+                    # Optionally measure fingerprint accuracy
+                    if self.config.accuracy_config is not None and isinstance(
+                        dataset, (TorchVisionDataset, ARFFDataset)
+                    ):
+                        logger.info("Start measuring fingerprint accuracy")
+                        res.accuracy_error = FingerprintAccuracyRandomTester(
+                            dataset, algo, self.config.accuracy_config, subsets_cache
+                        ).run()
+                        logger.info("Done measuring fingerprint accuracy")
+                    results.add(res)
+                    logger.info("Dumping temporary benchmark results to file %s", tmp_res_file)
+                    results.dump_csv(tmp_res_file)
+                except KeyboardInterrupt:
+                    logger.warning("Benchmark case interrupted")
+                    continue
         return results
 
     def _benchmark_fingerprint(
-        self, dataset: Dataset, fingerprint_method: FingerprintMethod, config: Config
+        self,
+        dataset: IterableDataset,
+        algo: Algorithm,
     ) -> tuple[float, float]:
-        """Benchmark the time needed to generate a fingerprint for a dataset with a given
-        fingerprint method and one configuration"""
+        """Benchmark the time needed to generate a fingerprint for a dataset
+        with a given algorithm"""
         # TODO(boyan): we could factorize the canonization step. Technically
         # we use the same canonical dataset for each config, and potentially
-        # for each fingerprint method even. Canonizing only once could
+        # for each algorithm even. Canonizing only once could
         # help us save a lot of time when benchmarking on the same dataset
         # (which is the common case)
         with catchtime() as canonization_time:
             logger.debug("Canonizing dataset %s", dataset.name)
-            c_dataset = CanonicalDataset(dataset, config=config)
+            algo.update(dataset)
         with catchtime() as fingerprint_time:
             logger.debug(
-                "Fingerprinting dataset %s with method %s",
+                "Fingerprinting dataset %s with algorithm %s",
                 dataset.name,
-                fingerprint_method.__name__,
+                str(algo),
             )
-            fingerprint = fingerprint_method(c_dataset, config)
+            _ = algo.digest()
         return canonization_time(), fingerprint_time()
