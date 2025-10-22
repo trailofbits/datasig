@@ -151,6 +151,108 @@ class ARFFDataset(IterableDataset):
         return data
 
 
+class TensorFlowDataset(SequenceDataset):
+    """Dataset loaded using the tensorflow_datasets python API"""
+
+    def __init__(self, dataset: Sequence[dict[str, Any]]):
+        """
+        Initialize a TensorFlow dataset.
+
+        Args:
+            dataset: A tensorflow_datasets dataset that supports indexing and length.
+                    Each sample should be a dictionary with keys like 'image' and 'label'.
+        """
+        self.dataset = dataset
+
+    def __getitem__(self, idx: int) -> bytes:
+        return TensorFlowDataset.serialize_data_point(self.dataset[idx])
+
+    def __len__(self) -> int:
+        return len(self.dataset)
+
+    def __iter__(self) -> Iterator[bytes]:
+        return (
+            TensorFlowDataset.serialize_data_point(data_point) for data_point in iter(self.dataset)
+        )
+
+    @property
+    def name(self) -> str:
+        """Name identifying the dataset"""
+        # TensorFlow datasets have a name attribute
+        if hasattr(self.dataset, "name"):
+            return self.dataset.name
+        return "TensorFlowDataset"
+
+    @staticmethod
+    def serialize_data_point(data: dict[str, Any]) -> bytes:
+        """
+        Serialize a tensorflow dataset sample.
+
+        Expected format: {'image': array, 'label': int}
+        Serializes as: [label (4 bytes)][image_shape_len (4 bytes)][image_shape][image_dtype_len (4 bytes)][image_dtype][image_data]
+        """
+        # Handle both dict format and tuple format (image, label)
+        if isinstance(data, dict):
+            image = data["image"]
+            label = int(data["label"])
+        else:
+            # Assume it's a tuple/list (image, label)
+            image, label = data
+            label = int(label)
+
+        # Convert image to numpy array if needed
+        import numpy as np
+        if not isinstance(image, np.ndarray):
+            image = np.array(image)
+
+        # Serialize the data
+        image_bytes = image.tobytes()
+        shape_bytes = str(image.shape).encode()
+        dtype_bytes = str(image.dtype).encode()
+
+        # Format: [label][shape_len][dtype_len][shape_bytes][image_len][dtype_bytes][image_bytes]
+        # Use '=' to disable automatic padding alignment
+        return struct.pack(
+            f"=III{len(shape_bytes)}sI{len(dtype_bytes)}s{len(image_bytes)}s",
+            label,
+            len(shape_bytes),
+            len(dtype_bytes),
+            shape_bytes,
+            len(image_bytes),
+            dtype_bytes,
+            image_bytes,
+        )
+
+    @staticmethod
+    def deserialize_data_point(data: bytes) -> dict[str, Any]:
+        """
+        Deserialize a tensorflow dataset sample back to dict format.
+        """
+        import numpy as np
+
+        # Unpack the header - use '=' to match serialization format
+        label, shape_len, dtype_len = struct.unpack_from("=III", data, offset=0)
+        offset = 12
+
+        shape_bytes: bytes = struct.unpack_from(f"={shape_len}s", data, offset=offset)[0]
+        offset += shape_len
+
+        image_len: int = struct.unpack_from("=I", data, offset=offset)[0]
+        offset += 4
+
+        dtype_bytes: bytes = struct.unpack_from(f"={dtype_len}s", data, offset=offset)[0]
+        offset += dtype_len
+
+        image_bytes: bytes = struct.unpack_from(f"={image_len}s", data, offset=offset)[0]
+
+        # Reconstruct the image
+        shape = eval(shape_bytes.decode())  # Safe since we created this
+        dtype = np.dtype(dtype_bytes.decode())
+        image = np.frombuffer(image_bytes, dtype=dtype).reshape(shape)
+
+        return {"image": image, "label": label}
+
+
 class CSVDataset(SequenceDataset):
     """Dataset contained in a CSV file"""
 
