@@ -16,7 +16,6 @@ dependencies = [
     "datasketch>=1.6.5",
     "numpy>=1.24.4",
     "pillow>=10.4.0",
-    "torch>=2.5.1",
 ]
 
 [dependency-groups]
