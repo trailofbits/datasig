@@ -677,8 +677,8 @@ def test_mnist_similarity():
 def test_serialization():
     img: Image.Image = test_data[0][0]
     label: int = test_data[0][1]
-    serialized = TorchVisionDataset.serialize_data_point((img, label))
-    deserialized_img, deserialized_label = TorchVisionDataset.deserialize_data_point(serialized)
+    serialized = TorchVisionDataset().serialize_data_point((img, label))
+    deserialized_img, deserialized_label = TorchVisionDataset().deserialize_data_point(serialized)
 
     assert label == deserialized_label
     assert img.mode == deserialized_img.mode

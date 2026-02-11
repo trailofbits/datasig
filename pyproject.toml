@@ -28,6 +28,10 @@ dev = [
     "requests>=2.32.4",
     "torchvision>=0.20.1",
 ]
+tfds = [
+    "tensorflow>=2.9.0",
+    "tensorflow-datasets>=4.9.2",
+]
 
 [build-system]
 requires = ["uv_build>=0.7.21,<0.8.0"]

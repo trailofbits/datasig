@@ -668,6 +668,6 @@ def test_similarity():
 
 def test_serialization():
     data_point = ["166679", "375", "Nitrogen dioxide (NO2)", "Mean", "ppb", "CD", "414", "Rockaway and Broad Channel (CD14)", "Summer 2009", "06/01/2009", "8.44"]
-    serialized = CSVDataset.serialize_data_point(data_point)
-    deserialized = CSVDataset.deserialize_data_point(serialized)
+    serialized = CSVDataset().serialize_data_point(data_point)
+    deserialized = CSVDataset().deserialize_data_point(serialized)
     assert data_point == deserialized

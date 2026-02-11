@@ -51,7 +51,7 @@ def test_similarity():
 
 def test_serialization():
     data_point = b"A, 1234, Test data"
-    serialized = ARFFDataset.serialize_data_point(data_point)
-    deserialized = ARFFDataset.deserialize_data_point(serialized)
+    serialized = ARFFDataset().serialize_data_point(data_point)
+    deserialized = ARFFDataset().deserialize_data_point(serialized)
 
     assert data_point == deserialized
