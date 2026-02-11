@@ -9,7 +9,6 @@ from collections.abc import Sequence
 import struct
 import numpy as np
 
-
 tf = None
 tfds = None
 try:
