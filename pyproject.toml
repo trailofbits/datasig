@@ -1,6 +1,6 @@
 [project]
 name = "datasig"
-version = "0.0.5"
+version = "0.0.6"
 requires-python = ">= 3.8"
 readme = "README.md"
 description = "Dataset fingerprinting library"
@@ -27,6 +27,10 @@ dev = [
     "pytest>=8.3.5",
     "requests>=2.32.4",
     "torchvision>=0.20.1",
+]
+tfds = [
+    "tensorflow>=2.9.0",
+    "tensorflow-datasets>=4.9.2",
 ]
 
 [build-system]
