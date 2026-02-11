@@ -1,6 +1,6 @@
 [project]
 name = "datasig"
-version = "0.0.5"
+version = "0.0.6"
 requires-python = ">= 3.8"
 readme = "README.md"
 description = "Dataset fingerprinting library"

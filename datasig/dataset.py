@@ -86,8 +86,10 @@ class TorchVisionDataset(SequenceDataset):
         return 0 if self.dataset is None else len(self.dataset)
 
     def __iter__(self) -> Iterator[bytes]:
-        return iter([]) if self.dataset is None else (
-            self.serialize_data_point(data_point) for data_point in iter(self.dataset)
+        return (
+            iter([])
+            if self.dataset is None
+            else (self.serialize_data_point(data_point) for data_point in iter(self.dataset))
         )
 
     @property
@@ -126,6 +128,7 @@ class TorchVisionDataset(SequenceDataset):
 
 class TfdsDataset(SequenceDataset):
     """Dataset loaded using tfds"""
+
     # There's a type checking issue without this trick
     _tf = tf
     _tfds = tfds
@@ -133,10 +136,9 @@ class TfdsDataset(SequenceDataset):
     def __init__(self, info: dict[str, Any], dataset: Sequence[dict[str, Any]] | None = None):
         if TfdsDataset._tfds is None:
             raise RuntimeError(
-                "TensorFlow Datasets not available. "
-                "Install tfds deps: datasig[tfds]"
+                "TensorFlow Datasets not available. " "Install tfds deps: datasig[tfds]"
             )
-        
+
         self.dataset = dataset
         self.features = list(info.keys())
         self.shapes = []
@@ -145,22 +147,27 @@ class TfdsDataset(SequenceDataset):
 
         for name in self.features:
             feat = info[name]
-            if isinstance(feat, (
-                TfdsDataset._tfds.features.Tensor,
-                TfdsDataset._tfds.features.Image,
-                TfdsDataset._tfds.features.Audio,
-                TfdsDataset._tfds.features.Video,
-                TfdsDataset._tfds.features.Scalar,
-                TfdsDataset._tfds.features.ClassLabel,
-                TfdsDataset._tfds.features.BBoxFeature,
-            )):
-                shape = tuple(feat.shape) # pyright: ignore
-                dtype = np.dtype(feat.dtype.as_numpy_dtype) # pyright: ignore
-                
+            if isinstance(
+                feat,
+                (
+                    TfdsDataset._tfds.features.Tensor,
+                    TfdsDataset._tfds.features.Image,
+                    TfdsDataset._tfds.features.Audio,
+                    TfdsDataset._tfds.features.Video,
+                    TfdsDataset._tfds.features.Scalar,
+                    TfdsDataset._tfds.features.ClassLabel,
+                    TfdsDataset._tfds.features.BBoxFeature,
+                ),
+            ):
+                shape = tuple(feat.shape)  # pyright: ignore
+                dtype = np.dtype(feat.dtype.as_numpy_dtype)  # pyright: ignore
+
                 self.dtypes.append(dtype)
                 self.shapes.append(shape)
                 self.byte_sizes.append(
-                    int(np.prod([s for s in shape if s is not None]) * dtype.itemsize) if None not in shape else None # pyright: ignore
+                    int(np.prod([s for s in shape if s is not None]) * dtype.itemsize)
+                    if None not in shape
+                    else None  # pyright: ignore
                 )
             else:
                 raise RuntimeError(f"Unsupported TFDS feature type {type(feat)}")
@@ -174,7 +181,11 @@ class TfdsDataset(SequenceDataset):
         return 0 if self.dataset is None else len(self.dataset)
 
     def __iter__(self) -> Iterator[bytes]:
-        return iter([]) if self.dataset is None else (self.serialize_data_point(data_point) for data_point in iter(self.dataset))
+        return (
+            iter([])
+            if self.dataset is None
+            else (self.serialize_data_point(data_point) for data_point in iter(self.dataset))
+        )
 
     @property
     def name(self) -> str:
@@ -186,7 +197,7 @@ class TfdsDataset(SequenceDataset):
         assert TfdsDataset._tf is not None
         format_str = ""
         args = []
-        
+
         for name, size in zip(self.features, self.byte_sizes):
             feat = data[name]
             assert isinstance(feat, TfdsDataset._tf.Tensor)
@@ -205,7 +216,9 @@ class TfdsDataset(SequenceDataset):
         assert TfdsDataset._tf is not None
         offset = 0
         dict_data = {}
-        for name, size, shape, dtype in zip(self.features, self.byte_sizes, self.shapes, self.dtypes):
+        for name, size, shape, dtype in zip(
+            self.features, self.byte_sizes, self.shapes, self.dtypes
+        ):
             if size is None:
                 feat_bytes_len: int = struct.unpack_from("I", data, offset=offset)[0]
                 offset += 4
@@ -214,7 +227,11 @@ class TfdsDataset(SequenceDataset):
             else:
                 feat_bytes: bytes = struct.unpack_from(f"{size}s", data, offset=offset)[0]
                 offset += size
-            dict_data[name] = TfdsDataset._tf.constant(np.frombuffer(feat_bytes, dtype=dtype).reshape(tuple(-1 if s is None else s for s in shape)))
+            dict_data[name] = TfdsDataset._tf.constant(
+                np.frombuffer(feat_bytes, dtype=dtype).reshape(
+                    tuple(-1 if s is None else s for s in shape)
+                )
+            )
 
         return dict_data
 
@@ -280,7 +297,7 @@ class CSVDataset(SequenceDataset):
     def _get_reader(self) -> Iterator[list[str]]:
         if self.csv_data is None:
             return iter([])
-        
+
         if isinstance(self.csv_data, (Path, str)):
             # Read from static file
             _csv_data = open(self.csv_data, "r", newline="\n")
