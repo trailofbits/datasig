@@ -3,7 +3,7 @@
 from datasig.dataset import TfdsDataset
 from datasig.algo import KeyedShaMinHash, UID
 from .utils import assert_fingerprint_similarity
-from pprint import pprint
+import types
 import numpy as np
 import pytest
 
@@ -36,15 +36,10 @@ if TFDS_AVAILABLE:
         batch_size=None
     )
 
-    # Convert to list (TfdsDataset expects Sequence)
-    mnist_train_list = list(mnist_train_ds)
-    mnist_test_list = list(mnist_test_ds)
-    feature_info = mnist_info.features
-
 
 def test_tfds_v0():
     """Snapshot test for TFDS MNIST dataset"""
-    dataset = TfdsDataset(feature_info, mnist_test_list)
+    dataset = TfdsDataset(mnist_info, mnist_test_ds)
     fingerprint = KeyedShaMinHash(dataset).digest()
     uid_val = UID(dataset).digest()
 
@@ -56,16 +51,18 @@ def test_tfds_v0():
 def test_tfds_similarity():
     """Test fingerprint similarity detection"""
     # Full training subset
-    d_full = TfdsDataset(feature_info, mnist_train_list)
+    d_full = TfdsDataset(mnist_info, mnist_train_ds)
 
     # Half training subset
-    d_half = TfdsDataset(feature_info, mnist_train_list[:500])
+    d_half = TfdsDataset(mnist_info, mnist_train_ds.take(500))
 
     # Test subset
-    d_test = TfdsDataset(feature_info, mnist_test_list)
+    d_test = TfdsDataset(mnist_info, mnist_test_ds)
 
     # Combined train + test
-    d_combined = TfdsDataset(feature_info, mnist_train_list + mnist_test_list)
+    d_combined = TfdsDataset(
+        mnist_info, mnist_train_ds.concatenate(mnist_test_ds)
+    )
 
     # Identical datasets (100% similarity)
     assert_fingerprint_similarity(d_full, d_full, 1.0)
@@ -83,9 +80,9 @@ def test_tfds_similarity():
 def test_tfds_serialization():
     """Test round-trip serialization/deserialization"""
     # Get single data point
-    data_point = mnist_test_list[0]
+    data_point = next(iter(mnist_test_ds))
 
-    dataset = TfdsDataset(feature_info, mnist_test_list)
+    dataset = TfdsDataset(mnist_info, mnist_test_ds)
 
     # Serialize
     serialized = dataset.serialize_data_point(data_point)
@@ -118,10 +115,11 @@ def test_tfds_serialization():
 def test_tfds_variable_length():
     """Test variable-length feature serialization"""
     # Create mock feature info with variable-length shape
-    var_feature_info = {
+    var_features = {
         'text': tfds.features.Tensor(shape=(None,), dtype=tf.int32),
         'label': tfds.features.ClassLabel(num_classes=2)
     }
+    var_feature_info = types.SimpleNamespace(features=var_features)
 
     # Create data points with different lengths
     var_data = [
