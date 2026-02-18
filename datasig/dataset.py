@@ -1,4 +1,4 @@
-from typing import Any
+from typing import Any, Protocol, Mapping
 from collections.abc import Iterable, Iterator
 from PIL import Image
 from pathlib import Path
@@ -8,6 +8,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 import struct
 import numpy as np
+from numpy.typing import ArrayLike
 
 tf = None
 tfds = None
@@ -125,27 +126,33 @@ class TorchVisionDataset(SequenceDataset):
         return Image.frombytes(mode, size, image_bytes, decoder_name="raw"), label
 
 
-class TfdsDataset(SequenceDataset):
+class TfdsInfoProtocol(Protocol):
+    features: Mapping[str, Any]
+
+
+class TfdsDataset(IterableDataset):
     """Dataset loaded using tfds"""
 
     # There's a type checking issue without this trick
     _tf = tf
     _tfds = tfds
 
-    def __init__(self, info: dict[str, Any], dataset: Sequence[dict[str, Any]] | None = None):
+    def __init__(
+        self, info: TfdsInfoProtocol, dataset: Iterable[dict[str, ArrayLike]] | None = None
+    ):
         if TfdsDataset._tfds is None:
             raise RuntimeError(
                 "TensorFlow Datasets not available. " "Install tfds deps: datasig[tfds]"
             )
 
         self.dataset = dataset
-        self.features = list(info.keys())
+        self.features = list(info.features.keys())
         self.shapes = []
         self.dtypes = []
         self.byte_sizes = []
 
         for name in self.features:
-            feat = info[name]
+            feat = info.features[name]
             if isinstance(
                 feat,
                 (
@@ -171,14 +178,6 @@ class TfdsDataset(SequenceDataset):
             else:
                 raise RuntimeError(f"Unsupported TFDS feature type {type(feat)}")
 
-    def __getitem__(self, idx: int) -> bytes:
-        if self.dataset is None:
-            raise IndexError
-        return self.serialize_data_point(self.dataset[idx])
-
-    def __len__(self) -> int:
-        return 0 if self.dataset is None else len(self.dataset)
-
     def __iter__(self) -> Iterator[bytes]:
         return (
             iter([])
@@ -192,7 +191,7 @@ class TfdsDataset(SequenceDataset):
         # In torch the dataset class names are descriptive like `MNIST`
         return type(self.dataset).__name__
 
-    def serialize_data_point(self, data: dict[str, Any]) -> bytes:
+    def serialize_data_point(self, data: dict[str, ArrayLike]) -> bytes:
         assert TfdsDataset._tf is not None
         format_str = ""
         args = []
@@ -214,7 +213,7 @@ class TfdsDataset(SequenceDataset):
     def deserialize_data_point(self, data: bytes) -> dict[str, Any]:
         assert TfdsDataset._tf is not None
         offset = 0
-        dict_data = {}
+        dict_data: dict[str, Any] = {}
         for name, size, shape, dtype in zip(
             self.features, self.byte_sizes, self.shapes, self.dtypes
         ):
