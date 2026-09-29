@@ -2,6 +2,7 @@ from collections.abc import Iterable
 from abc import ABC, abstractmethod
 import hashlib
 import struct
+from itertools import groupby, islice
 import numpy as np
 import datasketch  # pyright: ignore[reportMissingTypeStubs]
 from .fingerprint import (
@@ -147,6 +148,7 @@ class SingleShaMinHash(MinHash):
     """Generate dataset fingerprint based on a single SHA permutation
 
     The figerprint is computed using the MinHash scheme with a single permutation approximated by SHA256.
+    Each distinct data point hash occupies at most one bottom-k slot.
 
     See https://web.eecs.utk.edu/~jplank/plank/classes/cs494/494/notes/Min-Hash/index.html, Min Hash with one hash functions.
     And https://en.wikipedia.org/wiki/MinHash#Variant_with_a_single_hash_function.
@@ -163,15 +165,17 @@ class SingleShaMinHash(MinHash):
         return self.__class__(nb_signatures=self.nb_signatures)
 
     def _get_fingerprint(self) -> DatasetFingerprint:
-        # Relies on the fact that the data point hashes are sorted
-        if len(self._hashes) < self.nb_signatures:
+        # Sampling observations before deduplication lets repeated points
+        # displace distinct points from the bottom-k set sketch.
+        # MinHash.digest() has already sorted the hashes.
+        distinct_hashes = list(
+            islice((digest for digest, _ in groupby(self._hashes)), self.nb_signatures)
+        )
+        if len(distinct_hashes) < self.nb_signatures:
             raise ValueError(
-                f"Not enough data points to compute a fingerprint: we need at least {self.nb_signatures} data points."
+                f"Not enough distinct data points to compute a fingerprint: we need at least {self.nb_signatures} distinct data points."
             )
-
-        res = self._hashes[: self.nb_signatures]
-
-        return BasicDatasetFingerprint(res)  # pyright: ignore[reportArgumentType]
+        return BasicDatasetFingerprint(distinct_hashes)
 
 
 class DatasketchMinHash(MinHash):
