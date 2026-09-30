@@ -1,7 +1,7 @@
 [project]
 name = "datasig"
 version = "0.0.7"
-requires-python = ">= 3.8"
+requires-python = ">= 3.9"
 readme = "README.md"
 description = "Dataset fingerprinting library"
 authors = [
